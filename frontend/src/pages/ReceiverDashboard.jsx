@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { getFoods, createRequest, getRequests, getDeliveries } from '../api';
 import FoodCard from '../components/FoodCard';
 import MapView from '../components/MapView';
@@ -9,6 +10,7 @@ import MapView from '../components/MapView';
  */
 export default function ReceiverDashboard() {
   const { user } = useAuth();
+  const { playSoftAlert, playSuccessSound } = useTheme();
   const [foods, setFoods] = useState([]);
   const [requests, setRequests] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
@@ -31,6 +33,8 @@ export default function ReceiverDashboard() {
       setFoods(foodRes.data);
       setRequests(reqRes.data);
       setDeliveries(delRes.data);
+      // Play soft alert if new food is available
+      if (foodRes.data.length > 0) playSoftAlert();
     } catch (err) {
       console.error('Fetch error:', err);
     } finally {
@@ -39,8 +43,14 @@ export default function ReceiverDashboard() {
   };
 
   const handleRequest = async (food) => {
+    if (!user) {
+      setAlert({ type: 'error', message: 'Please login to request food!' });
+      setTimeout(() => setAlert(null), 3000);
+      return;
+    }
     try {
       await createRequest({ foodId: food._id, message: `Request from ${user.name}` });
+      playSuccessSound();
       setAlert({ type: 'success', message: 'Food requested successfully! 🎉' });
       fetchData();
       setTimeout(() => setAlert(null), 3000);
@@ -67,13 +77,13 @@ export default function ReceiverDashboard() {
       address: f.location?.address,
       type: 'pickup',
     })),
-    {
+    ...(user?.location ? [{
       lat: user.location?.lat,
       lng: user.location?.lng,
       label: 'Your Location',
       address: user.location?.address,
       type: 'drop',
-    },
+    }] : []),
   ];
 
   return (
@@ -81,7 +91,7 @@ export default function ReceiverDashboard() {
       <div className="dashboard-header">
         <div>
           <h1>🔵 Receiver Dashboard</h1>
-          <p>Welcome, {user.name}! Browse and request available food.</p>
+          <p>Welcome{user ? `, ${user.name}` : ''}! Browse and request available food.</p>
         </div>
         <button className="btn btn-primary" onClick={fetchData}>
           🔄 Refresh

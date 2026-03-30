@@ -1,39 +1,44 @@
+import { useLanguage } from '../context/LanguageContext';
+
 /**
- * Footer — Simple footer with branding and links.
+ * Footer — Translated footer with branding and links.
  */
 export default function Footer() {
+  const { t } = useLanguage();
+
   return (
     <footer className="footer">
       <div className="footer-container">
         <div className="footer-brand">
           <span className="brand-icon">🍽️</span>
           <span>Anna Setu</span>
-          <p className="footer-tagline">Bridging the gap between surplus food and hungry hearts.</p>
+          <p className="footer-tagline">{t('footerTagline')}</p>
         </div>
 
         <div className="footer-links">
           <div className="footer-col">
-            <h4>Platform</h4>
-            <a href="/">Home</a>
-            <a href="/login">Login</a>
-            <a href="/signup">Sign Up</a>
+            <h4>{t('platform')}</h4>
+            <a href="/">{t('home')}</a>
+            <a href="/login">{t('login')}</a>
+            <a href="/signup">{t('signUp')}</a>
+            <a href="/live-map">🗺️ {t('liveMap')}</a>
           </div>
           <div className="footer-col">
-            <h4>Roles</h4>
-            <a href="/signup">Become a Donor</a>
-            <a href="/signup">Register as NGO</a>
-            <a href="/signup">Join as Volunteer</a>
+            <h4>{t('roles')}</h4>
+            <a href="/signup">{t('becomeDonor')}</a>
+            <a href="/signup">{t('registerNGO')}</a>
+            <a href="/signup">{t('joinVolunteer')}</a>
           </div>
           <div className="footer-col">
-            <h4>About</h4>
-            <a href="/">Our Mission</a>
-            <a href="/">Contact Us</a>
-            <a href="/">Privacy Policy</a>
+            <h4>{t('about')}</h4>
+            <a href="/">{t('ourMission')}</a>
+            <a href="/">{t('contactUs')}</a>
+            <a href="/">{t('privacyPolicy')}</a>
           </div>
         </div>
 
         <div className="footer-bottom">
-          <p>&copy; {new Date().getFullYear()} Anna Setu — Reduce Food Waste, Feed the Needy 🌱</p>
+          <p>&copy; {new Date().getFullYear()} {t('footerCopyright')}</p>
         </div>
       </div>
     </footer>

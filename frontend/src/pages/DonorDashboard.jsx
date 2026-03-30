@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { createFood, getFoods, getRequests, getDeliveries } from '../api';
 import FoodCard from '../components/FoodCard';
 import MapView from '../components/MapView';
+import VoiceAssistant from '../components/VoiceAssistant';
+import FoodDetector from '../components/FoodDetector';
 
 /**
  * DonorDashboard — Donor can add food, view their listings, and track requests.
@@ -70,6 +72,33 @@ export default function DonorDashboard() {
     } catch (err) {
       setAlert({ type: 'error', message: err.response?.data?.message || 'Failed to create listing' });
     }
+  };
+
+  // Voice AI command handler
+  const handleVoiceCommand = (cmd) => {
+    if (cmd.action === 'add_food') {
+      setShowForm(true);
+      setFormData(prev => ({
+        ...prev,
+        foodType: cmd.foodType || prev.foodType,
+        quantity: cmd.quantity || prev.quantity,
+        address: cmd.location || prev.address,
+      }));
+      setAlert({ type: 'success', message: `🎤 Voice: Form filled with "${cmd.foodType || 'food'} — ${cmd.quantity || ''} — ${cmd.location || ''}"` });
+      setTimeout(() => setAlert(null), 4000);
+    }
+  };
+
+  // Food detector handler
+  const handleFoodDetected = (result) => {
+    setFormData(prev => ({
+      ...prev,
+      foodType: result.type,
+      quantity: result.servings + ' servings',
+    }));
+    setShowForm(true);
+    setAlert({ type: 'success', message: `🤖 AI detected: ${result.emoji} ${result.type} (${result.confidence}% confidence)` });
+    setTimeout(() => setAlert(null), 4000);
   };
 
   // Approve a request
@@ -222,6 +251,9 @@ export default function DonorDashboard() {
         <button className={`tab ${activeTab === 'map' ? 'active' : ''}`} onClick={() => setActiveTab('map')}>
           🗺️ Map
         </button>
+        <button className={`tab ${activeTab === 'ai' ? 'active' : ''}`} onClick={() => setActiveTab('ai')}>
+          🤖 AI Tools
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -309,6 +341,13 @@ export default function DonorDashboard() {
 
         {activeTab === 'map' && (
           <MapView markers={mapMarkers} />
+        )}
+
+        {activeTab === 'ai' && (
+          <div className="ai-tools-grid">
+            <VoiceAssistant onCommand={handleVoiceCommand} />
+            <FoodDetector onDetect={handleFoodDetected} />
+          </div>
         )}
       </div>
     </div>
