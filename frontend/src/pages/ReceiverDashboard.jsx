@@ -9,7 +9,7 @@ import MapView from '../components/MapView';
  * ReceiverDashboard — Receiver can view available food, request it, and track deliveries.
  */
 export default function ReceiverDashboard() {
-  const { user } = useAuth();
+  const { user, ensureGuestLogin } = useAuth();
   const { playSoftAlert, playSuccessSound } = useTheme();
   const [foods, setFoods] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -19,7 +19,17 @@ export default function ReceiverDashboard() {
   const [alert, setAlert] = useState(null);
 
   useEffect(() => {
-    fetchData();
+    const loadData = async () => {
+      // Auto-login as guest receiver if needed
+      const loggedInUser = await ensureGuestLogin('receiver');
+      if (loggedInUser) {
+        await fetchData();
+      } else {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
   }, []);
 
   const fetchData = async () => {

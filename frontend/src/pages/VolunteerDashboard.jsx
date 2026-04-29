@@ -8,15 +8,25 @@ import MapView from '../components/MapView';
  * VolunteerDashboard — Volunteer can view tasks, accept, and update delivery status.
  */
 export default function VolunteerDashboard() {
-  const { user } = useAuth();
-  const { playSoftAlert, playSuccessSound } = useTheme();
+  const { user, ensureGuestLogin } = useAuth();
+  const { playSoftAlert, playSuccessSound, playLaunchSound } = useTheme();
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('available');
   const [alert, setAlert] = useState(null);
 
   useEffect(() => {
-    fetchDeliveries();
+    const loadData = async () => {
+      // Auto-login as guest volunteer if needed
+      const loggedInUser = await ensureGuestLogin('volunteer');
+      if (loggedInUser) {
+        await fetchDeliveries();
+      } else {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
   }, []);
 
   const fetchDeliveries = async () => {
@@ -38,6 +48,7 @@ export default function VolunteerDashboard() {
       return;
     }
     try {
+      if (playLaunchSound) playLaunchSound(); // Keep the sound if it exists
       await acceptDelivery(id);
       setAlert({ type: 'success', message: 'Delivery accepted! 🚗' });
       fetchDeliveries();

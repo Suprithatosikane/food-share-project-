@@ -1,98 +1,16 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { login as loginAPI, signup as signupAPI } from '../api';
 
 /**
- * Home — EcoFeed-style landing page with integrated role-based auth.
- * Once logged in, user is redirected to their dashboard automatically.
- * No need to login separately for each role.
+ * Home — EcoFeed-style landing page.
+ * Users can directly navigate to Donor, Receiver, or Volunteer dashboards.
  */
 export default function Home() {
-  const { user, loginUser } = useAuth();
+  const { user } = useAuth();
   const { t } = useLanguage();
-  const navigate = useNavigate();
 
-  const [authMode, setAuthMode] = useState('login'); // 'login' or 'signup'
-  const [selectedRole, setSelectedRole] = useState('donor');
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    phone: '',
-    address: '',
-  });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const { data } = await loginAPI({
-        email: formData.email,
-        password: formData.password,
-      });
-      loginUser(data);
-      switch (data.role) {
-        case 'donor': navigate('/donor'); break;
-        case 'receiver': navigate('/receiver'); break;
-        case 'volunteer': navigate('/volunteer'); break;
-        default: navigate('/');
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignup = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const payload = {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        role: selectedRole,
-        phone: formData.phone,
-        location: {
-          address: formData.address,
-          lat: 28.6139 + (Math.random() - 0.5) * 0.1,
-          lng: 77.209 + (Math.random() - 0.5) * 0.1,
-        },
-      };
-      const { data } = await signupAPI(payload);
-      loginUser(data);
-      switch (data.role) {
-        case 'donor': navigate('/donor'); break;
-        case 'receiver': navigate('/receiver'); break;
-        case 'volunteer': navigate('/volunteer'); break;
-        default: navigate('/');
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Signup failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const roles = [
-    { value: 'donor', label: 'Donor', icon: '🍽️', desc: 'I have food to donate', color: '#16a34a' },
-    { value: 'receiver', label: 'Receiver', icon: '🏠', desc: 'NGO / Shelter seeking food', color: '#3b82f6' },
-    { value: 'volunteer', label: 'Volunteer', icon: '🚗', desc: 'I can deliver food', color: '#f59e0b' },
-  ];
-
-  // If already logged in, redirect to dashboard
+  // If already logged in, show welcome back hero
   if (user) {
     return (
       <div className="home-page">
@@ -139,15 +57,9 @@ export default function Home() {
           <p className="eco-hero-subtitle">
             {t('heroSubtitle')}
           </p>
-          <button
-            className="eco-btn eco-btn-primary"
-            onClick={() => {
-              setShowAuthModal(true);
-              setAuthMode('signup');
-            }}
-          >
+          <Link to="/donor" className="eco-btn eco-btn-primary">
             {t('getStarted')} <span className="eco-arrow">→</span>
-          </button>
+          </Link>
         </div>
         <div className="eco-hero-image">
           <div className="eco-image-card">
@@ -170,180 +82,6 @@ export default function Home() {
 
       {/* Live Map Preview Section */}
       {renderLiveMapSection()}
-
-      {/* Auth Modal Overlay */}
-      {showAuthModal && (
-        <div className="auth-modal-overlay" onClick={() => setShowAuthModal(false)}>
-          <div className="auth-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="auth-modal-close" onClick={() => setShowAuthModal(false)}>✕</button>
-            
-            <div className="auth-modal-header">
-              <span className="auth-modal-icon">🍽️</span>
-              <h2>Anna Setu</h2>
-              <p>{authMode === 'login' ? 'Welcome back! Sign in to continue.' : 'Create your account and start making a difference.'}</p>
-            </div>
-
-            {/* Auth Mode Toggle */}
-            <div className="auth-toggle">
-              <button
-                className={`auth-toggle-btn ${authMode === 'login' ? 'active' : ''}`}
-                onClick={() => { setAuthMode('login'); setError(''); }}
-              >
-                Sign In
-              </button>
-              <button
-                className={`auth-toggle-btn ${authMode === 'signup' ? 'active' : ''}`}
-                onClick={() => { setAuthMode('signup'); setError(''); }}
-              >
-                Create Account
-              </button>
-            </div>
-
-            {error && <div className="alert alert-error">{error}</div>}
-
-            {authMode === 'login' ? (
-              <form onSubmit={handleLogin} className="auth-form">
-                <div className="form-group">
-                  <label htmlFor="login-email">Email Address</label>
-                  <input
-                    type="email"
-                    id="login-email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="Enter your email"
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="login-password">Password</label>
-                  <input
-                    type="password"
-                    id="login-password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="Enter your password"
-                    required
-                  />
-                </div>
-                <button type="submit" className="eco-btn eco-btn-primary eco-btn-full" disabled={loading}>
-                  {loading ? <span className="spinner-sm"></span> : 'Sign In'}
-                </button>
-                <p className="auth-modal-footer">
-                  Don't have an account?{' '}
-                  <button type="button" className="auth-link" onClick={() => { setAuthMode('signup'); setError(''); }}>
-                    Create Account
-                  </button>
-                </p>
-              </form>
-            ) : (
-              <form onSubmit={handleSignup} className="auth-form">
-                {/* Role Selection */}
-                <div className="form-group">
-                  <label>Select Your Role</label>
-                  <div className="eco-role-selector">
-                    {roles.map((r) => (
-                      <label
-                        key={r.value}
-                        className={`eco-role-option ${selectedRole === r.value ? 'active' : ''}`}
-                        style={{ '--role-color': r.color }}
-                      >
-                        <input
-                          type="radio"
-                          name="role"
-                          value={r.value}
-                          checked={selectedRole === r.value}
-                          onChange={() => setSelectedRole(r.value)}
-                        />
-                        <span className="eco-role-icon">{r.icon}</span>
-                        <span className="eco-role-label">{r.label}</span>
-                        <span className="eco-role-desc">{r.desc}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="signup-name">Full Name</label>
-                    <input
-                      type="text"
-                      id="signup-name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      placeholder="Enter your name"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="signup-email">Email Address</label>
-                    <input
-                      type="email"
-                      id="signup-email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      placeholder="Enter your email"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="signup-password">Password</label>
-                    <input
-                      type="password"
-                      id="signup-password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleChange}
-                      placeholder="Min 6 characters"
-                      minLength={6}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="signup-phone">Phone Number</label>
-                    <input
-                      type="tel"
-                      id="signup-phone"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      placeholder="Enter phone number"
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="signup-address">Address / Location</label>
-                  <input
-                    type="text"
-                    id="signup-address"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    placeholder="Enter your address"
-                  />
-                </div>
-
-                <button type="submit" className="eco-btn eco-btn-primary eco-btn-full" disabled={loading}>
-                  {loading ? <span className="spinner-sm"></span> : 'Create Account'}
-                </button>
-                <p className="auth-modal-footer">
-                  Already have an account?{' '}
-                  <button type="button" className="auth-link" onClick={() => { setAuthMode('login'); setError(''); }}>
-                    Sign In
-                  </button>
-                </p>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 

@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { getFoods, getDeliveries } from '../api';
 
 // Fix default marker icon
@@ -59,6 +60,7 @@ const demoCenters = [
  */
 export default function LiveMapPage() {
   const { t } = useLanguage();
+  const { ensureGuestLogin } = useAuth();
   const [filter, setFilter] = useState('all');
   const [foods, setFoods] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
@@ -66,7 +68,12 @@ export default function LiveMapPage() {
 
   // Try to load real data, fall back to demo data
   useEffect(() => {
-    loadData();
+    const init = async () => {
+      await ensureGuestLogin('receiver'); // Use receiver role as a general viewer
+      loadData();
+    };
+    init();
+    
     // Simulate live updates with pulse effect
     const interval = setInterval(() => {
       setPulseKey(k => k + 1);
