@@ -32,12 +32,12 @@ jobs:
 
     # --- TEST STAGE (Linting) ---
     - name: Lint Check
-      # Using || true to ensure the workflow passes even if there are minor lint warnings
       run: |
         cd frontend
-        npm run lint || true
+        npm run lint || echo "Linting warnings found but continuing for demo purposes"
 
     # --- CONTAINERIZE STAGE ---
     - name: Docker Compose Build Check
       run: |
-        docker-compose config
+        # Using the updated 'docker compose' command for compatibility
+        docker compose config
