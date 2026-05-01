@@ -1,20 +1,17 @@
-# Use an official, lightweight Node.js runtime as the base image
-FROM node:20-alpine
-
-# Set the working directory directly inside the container
+# --- Stage 1: Build ---
+FROM node:20-alpine AS builder
 WORKDIR /app
-
-# Copy the package.json and package-lock.json to leverage Docker layer caching
 COPY package*.json ./
-
-# Install application dependencies
 RUN npm install
-
-# Copy the rest of the application source code 
 COPY . .
+RUN npm run build
 
-# Expose the port Vite development server runs on
+# --- Stage 2: Runtime ---
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package*.json ./
+RUN npm install -g serve
+
 EXPOSE 5173
-
-# Start the application using Vite's development server listening on all network interfaces
-CMD ["npm", "run", "dev", "--", "--host"]
+CMD ["serve", "-s", "dist", "-l", "5173"]
