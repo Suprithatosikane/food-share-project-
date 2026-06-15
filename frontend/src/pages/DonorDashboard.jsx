@@ -10,7 +10,7 @@ import FoodDetector from '../components/FoodDetector';
  * DonorDashboard — Donor can add food, view their listings, and track requests.
  */
 export default function DonorDashboard() {
-  const { user } = useAuth();
+  const { user, ensureGuestLogin } = useAuth();
   const [foods, setFoods] = useState([]);
   const [requests, setRequests] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
@@ -27,7 +27,21 @@ export default function DonorDashboard() {
   });
 
   useEffect(() => {
-    fetchData();
+    const loadData = async () => {
+      // Auto-login as guest donor if needed
+      const loggedInUser = await ensureGuestLogin('donor');
+      if (loggedInUser) {
+        setFormData(prev => ({
+          ...prev,
+          address: loggedInUser.location?.address || prev.address
+        }));
+        await fetchData();
+      } else {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
   }, []);
 
   const fetchData = async () => {
@@ -58,13 +72,13 @@ export default function DonorDashboard() {
         expiryTime: new Date(Date.now() + parseInt(formData.expiryHours) * 60 * 60 * 1000),
         location: {
           address: formData.address,
-          lat: user.location?.lat || 28.6139,
-          lng: user.location?.lng || 77.2090,
+          lat: user?.location?.lat || 28.6139,
+          lng: user?.location?.lng || 77.2090,
         },
       };
 
       await createFood(payload);
-      setAlert({ type: 'success', message: 'Food listing created successfully! 🎉' });
+      setAlert({ type: 'success', message: 'Food availability listed! 🎉' });
       setShowForm(false);
       setFormData({ foodType: '', quantity: '', description: '', expiryHours: '6', address: user?.location?.address || '' });
       fetchData();
@@ -101,7 +115,7 @@ export default function DonorDashboard() {
     setTimeout(() => setAlert(null), 4000);
   };
 
-  // Approve a request
+  // Approve/Reject requests
   const handleApprove = async (reqId) => {
     try {
       const { approveRequest } = await import('../api');
@@ -110,7 +124,7 @@ export default function DonorDashboard() {
       fetchData();
       setTimeout(() => setAlert(null), 3000);
     } catch (err) {
-      setAlert({ type: 'error', message: 'Failed to approve request' });
+      setAlert({ type: 'error', message: 'Failed to approve' });
     }
   };
 
@@ -122,7 +136,7 @@ export default function DonorDashboard() {
       fetchData();
       setTimeout(() => setAlert(null), 3000);
     } catch (err) {
-      setAlert({ type: 'error', message: 'Failed to reject request' });
+      setAlert({ type: 'error', message: 'Failed to reject' });
     }
   };
 
@@ -148,10 +162,10 @@ export default function DonorDashboard() {
       <div className="dashboard-header">
         <div>
           <h1>🟢 Donor Dashboard</h1>
-          <p>Welcome back, {user.name}! Manage your food donations.</p>
+          <p>Welcome{user ? `, ${user.name}` : ''}! Share your surplus food with the community.</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-          {showForm ? '✕ Close' : '➕ Add Food'}
+          {showForm ? '✕ Close Form' : '➕ Add Food Listing'}
         </button>
       </div>
 
@@ -161,7 +175,7 @@ export default function DonorDashboard() {
 
       {/* Add Food Form */}
       {showForm && (
-        <div className="card form-card animate-slide-down">
+        <div className="card form-card" style={{ marginBottom: '2rem' }}>
           <h3>📝 Add New Food Listing</h3>
           <form onSubmit={handleSubmit} className="food-form">
             <div className="form-row">
@@ -172,7 +186,7 @@ export default function DonorDashboard() {
                   id="foodType"
                   value={formData.foodType}
                   onChange={(e) => setFormData({ ...formData, foodType: e.target.value })}
-                  placeholder="e.g., Cooked Meals, Bread, Fruits"
+                  placeholder="e.g., Cooked Rice, Bread, Fruits"
                   required
                 />
               </div>
@@ -183,7 +197,7 @@ export default function DonorDashboard() {
                   id="quantity"
                   value={formData.quantity}
                   onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                  placeholder="e.g., 50 plates, 20 kg"
+                  placeholder="e.g., 50 plates, 10 kg"
                   required
                 />
               </div>
@@ -195,14 +209,14 @@ export default function DonorDashboard() {
                 id="description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Describe the food, freshness, any details..."
-                rows={3}
+                placeholder="Freshness, dietary info, or any details..."
+                rows={2}
               />
             </div>
 
             <div className="form-row">
               <div className="form-group">
-                <label htmlFor="expiryHours">Expiry (hours from now)</label>
+                <label htmlFor="expiryHours">Expires In (hours)</label>
                 <select
                   id="expiryHours"
                   value={formData.expiryHours}
@@ -213,8 +227,6 @@ export default function DonorDashboard() {
                   <option value="6">6 hours</option>
                   <option value="12">12 hours</option>
                   <option value="24">24 hours</option>
-                  <option value="48">48 hours</option>
-                  <option value="72">72 hours</option>
                 </select>
               </div>
               <div className="form-group">
@@ -224,14 +236,14 @@ export default function DonorDashboard() {
                   id="address"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="Pickup location"
+                  placeholder="Where can someone pick this up?"
                   required
                 />
               </div>
             </div>
 
-            <button type="submit" className="btn btn-primary">
-              🍽️ List Food
+            <button type="submit" className="btn btn-primary btn-full">
+              🚀 Post Availability
             </button>
           </form>
         </div>
@@ -249,10 +261,10 @@ export default function DonorDashboard() {
           🚚 Deliveries ({deliveries.length})
         </button>
         <button className={`tab ${activeTab === 'map' ? 'active' : ''}`} onClick={() => setActiveTab('map')}>
-          🗺️ Map
+          🗺️ Live Tracking
         </button>
         <button className={`tab ${activeTab === 'ai' ? 'active' : ''}`} onClick={() => setActiveTab('ai')}>
-          🤖 AI Tools
+          智能 AI 工具
         </button>
       </div>
 
@@ -263,8 +275,8 @@ export default function DonorDashboard() {
             {foods.length === 0 ? (
               <div className="empty-state">
                 <span className="empty-icon">🍽️</span>
-                <h3>No food listed yet</h3>
-                <p>Click "Add Food" to create your first listing!</p>
+                <h3>No active listings</h3>
+                <p>Click "Add Food" to start sharing!</p>
               </div>
             ) : (
               foods.map((food) => (
@@ -279,17 +291,17 @@ export default function DonorDashboard() {
             {requests.length === 0 ? (
               <div className="empty-state">
                 <span className="empty-icon">📨</span>
-                <h3>No requests yet</h3>
-                <p>Requests from receivers will appear here.</p>
+                <h3>No pending requests</h3>
+                <p>Requests from neighbors will appear here.</p>
               </div>
             ) : (
               requests.map((req) => (
                 <div key={req._id} className="request-card">
                   <div className="request-info">
                     <h4>{req.foodId?.foodType || 'Food Item'}</h4>
-                    <p>Requested by: <strong>{req.receiverId?.name || 'Unknown'}</strong></p>
-                    <p>📍 {req.receiverId?.location?.address || 'N/A'}</p>
-                    {req.message && <p className="request-message">💬 {req.message}</p>}
+                    <p>Quantity: {req.foodId?.quantity}</p>
+                    <p>Requested by: {req.receiverId?.name || 'Receiver'}</p>
+                    {req.message && <p className="request-message">"{req.message}"</p>}
                     <span className={`status-badge status-${req.status}`}>{req.status}</span>
                   </div>
                   {req.status === 'pending' && (
@@ -313,24 +325,22 @@ export default function DonorDashboard() {
             {deliveries.length === 0 ? (
               <div className="empty-state">
                 <span className="empty-icon">🚚</span>
-                <h3>No deliveries yet</h3>
-                <p>Active deliveries will appear here once requests are approved.</p>
+                <h3>No active deliveries</h3>
+                <p>Track your food until it reaches the receiver here.</p>
               </div>
             ) : (
               deliveries.map((del) => (
                 <div key={del._id} className="delivery-card">
                   <div className="delivery-info">
                     <h4>{del.foodId?.foodType || 'Food Item'}</h4>
-                    <p>📍 Pickup: {del.pickupLocation?.address || 'N/A'}</p>
-                    <p>📍 Drop: {del.dropLocation?.address || 'N/A'}</p>
+                    <p>📍 {del.dropLocation?.address || 'N/A'}</p>
                     {del.volunteerId && <p>🚗 Volunteer: {del.volunteerId.name}</p>}
                   </div>
                   <div className="delivery-status">
                     <div className="status-tracker">
-                      <div className={`status-step ${['pending','accepted','picked','delivered'].indexOf(del.status) >= 0 ? 'active' : ''}`}>Pending</div>
-                      <div className={`status-step ${['accepted','picked','delivered'].indexOf(del.status) >= 0 ? 'active' : ''}`}>Accepted</div>
-                      <div className={`status-step ${['picked','delivered'].indexOf(del.status) >= 0 ? 'active' : ''}`}>Picked</div>
-                      <div className={`status-step ${del.status === 'delivered' ? 'active' : ''}`}>Delivered</div>
+                      <div className={`status-step ${['pending','accepted','picked','delivered'].indexOf(del.status) >= 0 ? 'active' : ''}`}>Wait</div>
+                      <div className={`status-step ${['accepted','picked','delivered'].indexOf(del.status) >= 0 ? 'active' : ''}`}>Picked</div>
+                      <div className={`status-step ${del.status === 'delivered' ? 'active' : ''}`}>Done</div>
                     </div>
                   </div>
                 </div>
@@ -344,7 +354,7 @@ export default function DonorDashboard() {
         )}
 
         {activeTab === 'ai' && (
-          <div className="ai-tools-grid">
+          <div className="ai-tools-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             <VoiceAssistant onCommand={handleVoiceCommand} />
             <FoodDetector onDetect={handleFoodDetected} />
           </div>

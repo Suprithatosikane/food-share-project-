@@ -108,9 +108,11 @@ export default function Navbar() {
               </div>
             </>
           ) : (
-            <Link to="/login" className="eco-btn eco-btn-login">
-              <span className="login-icon">→</span> {t('login')}
-            </Link>
+            <>
+              <Link to="/donor" className="nav-link">🍽️ {t('donor')}</Link>
+              <Link to="/receiver" className="nav-link">🏠 {t('receiver')}</Link>
+              <Link to="/volunteer" className="nav-link">🚗 {t('volunteer')}</Link>
+            </>
           )}
         </div>
       </div>

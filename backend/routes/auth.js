@@ -93,6 +93,50 @@ router.post('/login', async (req, res) => {
 });
 
 /**
+ * POST /api/auth/guest
+ * Auto-create or find a guest user for a given role and return a JWT.
+ * This allows the app to work without a manual login flow.
+ */
+router.post('/guest', async (req, res) => {
+  try {
+    const { role } = req.body;
+
+    if (!['donor', 'receiver', 'volunteer'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role. Must be donor, receiver, or volunteer' });
+    }
+
+    const guestEmail = `guest_${role}@annasetu.local`;
+
+    // Find or create the guest user for this role
+    let user = await User.findOne({ email: guestEmail });
+
+    if (!user) {
+      user = await User.create({
+        name: `Guest ${role.charAt(0).toUpperCase() + role.slice(1)}`,
+        email: guestEmail,
+        password: 'guestpassword123',
+        role,
+        phone: '',
+        location: { address: 'Bangalore, India', lat: 12.9716, lng: 77.5946 },
+      });
+    }
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      location: user.location,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    console.error('Guest login error:', error);
+    res.status(500).json({ message: 'Server error during guest login' });
+  }
+});
+
+/**
  * GET /api/auth/me
  * Get current authenticated user's profile
  */

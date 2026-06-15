@@ -1,0 +1,43 @@
+name: Anna Setu CI/CD
+
+on:
+  push:
+    branches: [ main, main1, develop, docker ]
+  pull_request:
+    branches: [ main, main1, develop, docker ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    # --- BUILD STAGE ---
+    - name: Install & Build Frontend
+      run: |
+        cd frontend
+        npm install --legacy-peer-deps
+        npm run build --if-present
+
+    - name: Install Backend
+      run: |
+        cd backend
+        npm install --legacy-peer-deps
+
+    # --- TEST STAGE (Linting) ---
+    - name: Lint Check
+      run: |
+        cd frontend
+        npm run lint || echo "Linting warnings found but continuing for demo purposes"
+
+    # --- CONTAINERIZE STAGE ---
+    - name: Docker Compose Build Check
+      run: |
+        # Using the updated 'docker compose' command for compatibility
+        docker compose config

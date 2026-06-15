@@ -9,9 +9,10 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 const ThemeContext = createContext(null);
 
 // Web Audio API sound generators
-const AudioCtx = window.AudioContext || window.webkitAudioContext;
+const AudioCtx = (typeof window !== 'undefined') ? (window.AudioContext || window.webkitAudioContext) : null;
 
 function playSoftAlert() {
+  if (!AudioCtx) return;
   try {
     const ctx = new AudioCtx();
     // Soft "ping" / "ding" sound
@@ -50,6 +51,7 @@ function playSoftAlert() {
 }
 
 function playSuccessSound() {
+  if (!AudioCtx) return;
   try {
     const ctx = new AudioCtx();
     // Success chime — ascending 3-note arpeggio
@@ -91,9 +93,53 @@ function playSuccessSound() {
   }
 }
 
+function playLaunchSound() {
+  if (!AudioCtx) return;
+  try {
+    const ctx = new AudioCtx();
+    // Quick, energetic "whoosh-ding"
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.type = 'sine';
+    osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.2);
+    
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.4);
+
+    // Complementary chime
+    setTimeout(() => {
+      const chime = ctx.createOscillator();
+      const cGain = ctx.createGain();
+      chime.connect(cGain);
+      cGain.connect(ctx.destination);
+      chime.type = 'sine';
+      chime.frequency.setValueAtTime(1500, ctx.currentTime);
+      cGain.gain.setValueAtTime(0.1, ctx.currentTime);
+      cGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      chime.start(ctx.currentTime);
+      chime.stop(ctx.currentTime + 0.3);
+    }, 150);
+
+    setTimeout(() => ctx.close(), 1000);
+  } catch (e) {
+    console.log('Sound error');
+  }
+}
+
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('annaSetu_theme') || 'light';
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('annaSetu_theme') || 'light';
+    }
+    return 'light';
   });
 
   useEffect(() => {
@@ -110,7 +156,7 @@ export function ThemeProvider({ children }) {
   return (
     <ThemeContext.Provider value={{
       theme, isDark, toggleTheme,
-      playSoftAlert, playSuccessSound
+      playSoftAlert, playSuccessSound, playLaunchSound
     }}>
       {children}
     </ThemeContext.Provider>

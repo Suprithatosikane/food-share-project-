@@ -19,15 +19,13 @@ export default function Footer() {
           <div className="footer-col">
             <h4>{t('platform')}</h4>
             <a href="/">{t('home')}</a>
-            <a href="/login">{t('login')}</a>
-            <a href="/signup">{t('signUp')}</a>
             <a href="/live-map">🗺️ {t('liveMap')}</a>
           </div>
           <div className="footer-col">
             <h4>{t('roles')}</h4>
-            <a href="/signup">{t('becomeDonor')}</a>
-            <a href="/signup">{t('registerNGO')}</a>
-            <a href="/signup">{t('joinVolunteer')}</a>
+            <a href="/donor">{t('becomeDonor')}</a>
+            <a href="/receiver">{t('registerNGO')}</a>
+            <a href="/volunteer">{t('joinVolunteer')}</a>
           </div>
           <div className="footer-col">
             <h4>{t('about')}</h4>
