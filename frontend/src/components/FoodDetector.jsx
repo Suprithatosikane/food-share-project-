@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { detectFoodImage } from '../api';
 
 /**
  * FoodDetector — AI-based food type, freshness, and servings detection from uploaded images.
@@ -317,7 +318,26 @@ export default function FoodDetector({ onDetect }) {
     if (!image) return;
     setDetecting(true);
 
-    setStage('Loading image...');
+    try {
+      setStage('Sending image to Gemini AI...');
+      const response = await detectFoodImage(preview);
+      
+      if (response.data && response.data.success && response.data.result) {
+        const detected = response.data.result;
+        setStage('Done ✅');
+        setResult(detected);
+        setDetecting(false);
+        if (onDetect) onDetect(detected);
+        return;
+      }
+      
+      console.log('Gemini backend returned fallback. Running client-side heuristics...');
+    } catch (err) {
+      console.warn('Gemini API call failed. Falling back to client heuristics:', err);
+    }
+
+    // Local Fallback Heuristics
+    setStage('Loading image (Fallback)...');
     const img = new Image();
     img.src = preview;
     await new Promise(resolve => { img.onload = resolve; });

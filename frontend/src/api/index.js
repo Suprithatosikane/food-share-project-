@@ -28,6 +28,7 @@ export const getFoods = () => API.get('/food');
 export const getFoodById = (id) => API.get(`/food/${id}`);
 export const updateFood = (id, data) => API.put(`/food/${id}`, data);
 export const deleteFood = (id) => API.delete(`/food/${id}`);
+export const detectFoodImage = (imageBase64) => API.post('/food/detect', { imageBase64 });
 
 // ==================== REQUESTS ====================
 export const createRequest = (data) => API.post('/requests', data);

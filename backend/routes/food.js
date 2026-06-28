@@ -138,4 +138,88 @@ router.delete('/:id', protect, authorize('donor'), async (req, res) => {
   }
 });
 
+/**
+ * POST /api/food/detect
+ * Analyze food image using Gemini AI API (if key is set)
+ */
+router.post('/detect', protect, async (req, res) => {
+  try {
+    const { imageBase64 } = req.body;
+    if (!imageBase64) {
+      return res.status(400).json({ message: 'No image data provided' });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn('⚠️ GEMINI_API_KEY not configured in backend/.env. Falling back to local smart canvas heuristics.');
+      return res.json({ useClientFallback: true });
+    }
+
+    // Extract raw base64 data and mime type
+    const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
+    if (!mimeMatch) {
+      return res.status(400).json({ message: 'Invalid image format' });
+    }
+    const mimeType = mimeMatch[1];
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+
+    // Call Gemini 1.5 Flash API
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    
+    const prompt = `Identify the food item in the image. You must output ONLY a valid JSON object in this exact format:
+{
+  "type": "Upma" | "Biryani" | "Rice & Sambar" | "Chapathi & Dal" | "Dosa & Chutney" | "Idli & Vada" | "Mixed Fruits" | "Vegetable Curry" | "Bread & Bakery" | "Snacks & Sweets",
+  "category": "South Indian Breakfast" | "Main Course" | "South Indian" | "North Indian" | "Fruits" | "Bakery" | "Snacks",
+  "emoji": "🥣" | "🍛" | "🍚" | "🫓" | "🥞" | "🔵" | "🍎" | "🥘" | "🍞" | "🍪",
+  "confidence": number (70-100),
+  "freshness": number (0-100, calculate based on decay, bruising, oxidation, rot, bites, etc. If fruits are rotten/bitten/old, freshness must be below 40%),
+  "servings": "1-2 servings" | "3-5 servings" | "6-10 servings" | "0-1 (Spoiled/Rotten)"
+}`;
+
+    const response = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: mimeType,
+                  data: base64Data
+                }
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Gemini API Error details:', errText);
+      return res.json({ useClientFallback: true, error: 'Gemini API call failed' });
+    }
+
+    const data = await response.json();
+    const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!textResult) {
+      return res.json({ useClientFallback: true, error: 'Empty response from Gemini' });
+    }
+
+    const resultObj = JSON.parse(textResult.trim());
+    res.json({ success: true, result: resultObj });
+
+  } catch (error) {
+    console.error('Gemini Detection Error:', error);
+    res.json({ useClientFallback: true, error: error.message });
+  }
+});
+
 module.exports = router;
