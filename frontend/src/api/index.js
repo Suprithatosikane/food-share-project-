@@ -29,12 +29,16 @@ export const getFoods = () => API.get('/food');
 export const getFoodById = (id) => API.get(`/food/${id}`);
 export const updateFood = (id, data) => API.put(`/food/${id}`, data);
 export const deleteFood = (id) => API.delete(`/food/${id}`);
+export const detectFoodImage = (imageBase64) => API.post('/food/detect', { imageBase64 });
 
 // ==================== REQUESTS ====================
 export const createRequest = (data) => API.post('/requests', data);
 export const getRequests = () => API.get('/requests');
 export const approveRequest = (id) => API.put(`/requests/${id}/approve`);
 export const rejectRequest = (id) => API.put(`/requests/${id}/reject`);
+export const getDailyRequirements = () => API.get('/requests/daily-requirements');
+export const acceptDailyRequirement = (id) => API.put(`/requests/daily-requirements/${id}/accept`);
+export const updateDailyRequirement = (data) => API.put('/auth/daily-requirement', data);
 
 // ==================== DELIVERIES ====================
 export const getDeliveries = () => API.get('/deliveries');

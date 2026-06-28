@@ -25,6 +25,10 @@ const requestSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  requestedQuantity: {
+    type: String,
+    required: true,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Request', requestSchema);

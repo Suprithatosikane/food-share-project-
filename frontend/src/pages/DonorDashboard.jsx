@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { createFood, getFoods, getRequests, getDeliveries } from '../api';
+import { createFood, getFoods, getRequests, getDeliveries, getDailyRequirements, acceptDailyRequirement } from '../api';
 import FoodCard from '../components/FoodCard';
 import MapView from '../components/MapView';
 import VoiceAssistant from '../components/VoiceAssistant';
 import FoodDetector from '../components/FoodDetector';
 
 /**
- * DonorDashboard — Donor can add food, view their listings, and track requests.
+ * DonorDashboard — Donor can add food, view their listings, track requests, and fulfill daily requirements.
  */
 export default function DonorDashboard() {
   const { user, ensureGuestLogin } = useAuth();
@@ -26,6 +26,25 @@ export default function DonorDashboard() {
     address: user?.location?.address || '',
   });
 
+  // Daily Food Requirement Notification State
+  const [activeDailyRequest, setActiveDailyRequest] = useState(null);
+
+  // Haversine formula to compute distance in km between two coordinate pairs
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 9999;
+    const R = 6371; // Earth radius in km
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
   useEffect(() => {
     const loadData = async () => {
       // Auto-login as guest donor if needed
@@ -43,6 +62,53 @@ export default function DonorDashboard() {
     
     loadData();
   }, []);
+
+  // Short-polling to check for pending daily requirements nearby
+  useEffect(() => {
+    if (!user) return;
+
+    const checkDailyRequirements = async () => {
+      try {
+        const { data } = await getDailyRequirements();
+        
+        // Load ignored requests from localStorage
+        let ignored = [];
+        try {
+          const stored = localStorage.getItem('ignoredDailyRequests');
+          if (stored) ignored = JSON.parse(stored);
+        } catch (e) {
+          console.error('Error reading ignored list:', e);
+        }
+
+        // Filter: status is pending, not ignored, and distance <= 5 km
+        const nearby = data.filter(req => {
+          if (req.status !== 'pending') return false;
+          if (ignored.includes(req._id)) return false;
+          
+          const donorLat = user.location?.lat || 12.9716;
+          const donorLng = user.location?.lng || 77.5946;
+          const receiverLat = req.location?.lat || 0;
+          const receiverLng = req.location?.lng || 0;
+          
+          const distance = calculateDistance(donorLat, donorLng, receiverLat, receiverLng);
+          return distance <= 5; // 5 km threshold
+        });
+
+        if (nearby.length > 0) {
+          // Display the first matching pending request
+          setActiveDailyRequest(nearby[0]);
+        } else {
+          setActiveDailyRequest(null);
+        }
+      } catch (err) {
+        console.error('Error fetching daily requirements:', err);
+      }
+    };
+
+    checkDailyRequirements();
+    const interval = setInterval(checkDailyRequirements, 10000); // Check every 10 seconds
+    return () => clearInterval(interval);
+  }, [user]);
 
   const fetchData = async () => {
     try {
@@ -138,6 +204,35 @@ export default function DonorDashboard() {
     } catch (err) {
       setAlert({ type: 'error', message: 'Failed to reject' });
     }
+  };
+
+  const handleAcceptDailyRequest = async (id) => {
+    try {
+      await acceptDailyRequirement(id);
+      setAlert({ type: 'success', message: 'Daily food requirement accepted and scheduled! 🎉' });
+      setActiveDailyRequest(null);
+      fetchData(); // Refresh listings and deliveries tabs
+      setTimeout(() => setAlert(null), 3000);
+    } catch (err) {
+      setAlert({ type: 'error', message: err.response?.data?.message || 'Failed to accept daily requirement' });
+      setTimeout(() => setAlert(null), 3000);
+    }
+  };
+
+  const handleIgnoreDailyRequest = (id) => {
+    try {
+      let ignored = [];
+      const stored = localStorage.getItem('ignoredDailyRequests');
+      if (stored) ignored = JSON.parse(stored);
+      
+      if (!ignored.includes(id)) {
+        ignored.push(id);
+        localStorage.setItem('ignoredDailyRequests', JSON.stringify(ignored));
+      }
+    } catch (e) {
+      console.error('Error saving ignored daily request:', e);
+    }
+    setActiveDailyRequest(null);
   };
 
   if (loading) {
@@ -299,7 +394,8 @@ export default function DonorDashboard() {
                 <div key={req._id} className="request-card">
                   <div className="request-info">
                     <h4>{req.foodId?.foodType || 'Food Item'}</h4>
-                    <p>Quantity: {req.foodId?.quantity}</p>
+                    <p>📦 Requested: {req.requestedQuantity || req.foodId?.quantity}</p>
+                    <p>📋 Remaining in listing: {req.foodId?.quantity}</p>
                     <p>Requested by: {req.receiverId?.name || 'Receiver'}</p>
                     {req.message && <p className="request-message">"{req.message}"</p>}
                     <span className={`status-badge status-${req.status}`}>{req.status}</span>
@@ -332,7 +428,7 @@ export default function DonorDashboard() {
               deliveries.map((del) => (
                 <div key={del._id} className="delivery-card">
                   <div className="delivery-info">
-                    <h4>{del.foodId?.foodType || 'Food Item'}</h4>
+                    <h4>{del.foodId?.foodType || 'Food Item'} ({del.requestedQuantity || del.foodId?.quantity})</h4>
                     <p>📍 {del.dropLocation?.address || 'N/A'}</p>
                     {del.volunteerId && <p>🚗 Volunteer: {del.volunteerId.name}</p>}
                   </div>
@@ -360,6 +456,57 @@ export default function DonorDashboard() {
           </div>
         )}
       </div>
+
+      {/* Daily Requirement Alert Popup Modal */}
+      {activeDailyRequest && (
+        <div className="auth-modal-overlay" style={{ zIndex: 1050 }}>
+          <div className="auth-modal" style={{ maxWidth: '440px' }}>
+            <div className="auth-modal-header" style={{ marginBottom: '1.5rem' }}>
+              <span className="auth-modal-icon" style={{ fontSize: '3rem' }}>🍽️</span>
+              <h2>Daily Food Requirement</h2>
+              <p>A receiver near you requires meals today.</p>
+            </div>
+
+            <div style={{
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: '16px',
+              padding: '1.25rem',
+              marginBottom: '1.5rem',
+              textAlign: 'center'
+            }}>
+              <p style={{ fontSize: '1.15rem', margin: '0 0 0.5rem 0', fontWeight: 700, color: '#16a34a' }}>
+                🍽️ A receiver near you requires {activeDailyRequest.quantity} meals today. Would you like to fulfill this request?
+              </p>
+              {activeDailyRequest.mealType && (
+                <p style={{ margin: '0 0 0.5rem 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  Meal preference: <strong>{activeDailyRequest.mealType}</strong>
+                </p>
+              )}
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                📍 {activeDailyRequest.location?.address || 'Nearby Location'}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button
+                className="btn btn-success btn-full"
+                onClick={() => handleAcceptDailyRequest(activeDailyRequest._id)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.85rem' }}
+              >
+                ✅ Accept Request
+              </button>
+              <button
+                className="btn btn-danger btn-full"
+                onClick={() => handleIgnoreDailyRequest(activeDailyRequest._id)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.85rem' }}
+              >
+                ❌ Ignore
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
