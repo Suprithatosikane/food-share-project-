@@ -155,6 +155,14 @@ router.get('/me', protect, async (req, res) => {
 });
 
 /**
+ * PUT /api/auth/location
+ * Update authenticated user's location coordinates and address
+ */
+router.put('/location', protect, async (req, res) => {
+  try {
+    const { address, lat, lng } = req.body;
+    const user = await User.findById(req.user._id);
+
  * PUT /api/auth/daily-requirement
  * Update current authenticated receiver's daily food requirement preferences
  */
@@ -171,6 +179,10 @@ router.put('/daily-requirement', protect, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    user.location = {
+      address: address || user.location.address,
+      lat: lat !== undefined ? lat : user.location.lat,
+      lng: lng !== undefined ? lng : user.location.lng,
     user.dailyRequirement = {
       enabled: enabled ?? user.dailyRequirement.enabled,
       quantity: quantity !== undefined ? Number(quantity) : user.dailyRequirement.quantity,
@@ -188,6 +200,10 @@ router.put('/daily-requirement', protect, async (req, res) => {
       role: user.role,
       phone: user.phone,
       location: user.location,
+    });
+  } catch (error) {
+    console.error('Update location error:', error);
+    res.status(500).json({ message: 'Server error during location updates' });
       dailyRequirement: user.dailyRequirement,
     });
   } catch (error) {

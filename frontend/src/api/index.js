@@ -20,6 +20,7 @@ API.interceptors.request.use((config) => {
 export const signup = (data) => API.post('/auth/signup', data);
 export const login = (data) => API.post('/auth/login', data);
 export const guestLogin = (role) => API.post('/auth/guest', { role });
+export const updateLocation = (data) => API.put('/auth/location', data);
 export const getMe = () => API.get('/auth/me');
 
 // ==================== FOOD ====================

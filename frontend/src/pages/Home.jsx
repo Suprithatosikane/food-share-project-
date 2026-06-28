@@ -29,11 +29,6 @@ export default function Home() {
             {t('goToDashboard')} <span className="eco-arrow">→</span>
           </Link>
           </div>
-          <div className="eco-hero-image">
-            <div className="eco-image-card">
-              <img src="/hero-children.jpg" alt="Children receiving food" className="eco-hero-img" />
-            </div>
-          </div>
         </section>
 
         {/* Keep existing sections below */}
@@ -46,7 +41,7 @@ export default function Home() {
 
   return (
     <div className="home-page">
-      {/* EcoFeed-Style Hero Section */}
+      {/* EcoFeed-Style Hero Section (Fullscreen background) */}
       <section className="eco-hero">
         <div className="eco-hero-content">
           <h1 className="eco-hero-title">
@@ -60,11 +55,6 @@ export default function Home() {
           <Link to="/donor" className="eco-btn eco-btn-primary">
             {t('getStarted')} <span className="eco-arrow">→</span>
           </Link>
-        </div>
-        <div className="eco-hero-image">
-          <div className="eco-image-card">
-            <img src="/hero-children.jpg" alt="Children receiving food" className="eco-hero-img" />
-          </div>
         </div>
       </section>
 

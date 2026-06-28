@@ -60,11 +60,40 @@ const demoCenters = [
  */
 export default function LiveMapPage() {
   const { t } = useLanguage();
-  const { ensureGuestLogin } = useAuth();
+  const { ensureGuestLogin, user, updateLiveLocation } = useAuth();
   const [filter, setFilter] = useState('all');
   const [foods, setFoods] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
   const [pulseKey, setPulseKey] = useState(0);
+
+  // Determine center based on user live geolocation (re-centers dynamically if user moves)
+  const mapCenter = user?.location?.lat && user?.location?.lng
+    ? [user.location.lat, user.location.lng]
+    : [12.9716, 77.5946];
+
+  // Calculate coordinates shifts from Bangalore coordinates base
+  const latOffset = mapCenter[0] - 12.9716;
+  const lngOffset = mapCenter[1] - 77.5946;
+
+  // Localize demo coordinates around the live user's location
+  const localDemoDonations = demoDonations.map(d => ({
+    ...d,
+    lat: d.lat + latOffset,
+    lng: d.lng + lngOffset
+  }));
+
+  const localDemoVolunteers = demoVolunteers.map(v => ({
+    ...v,
+    lat: v.lat + latOffset,
+    lng: v.lng + lngOffset,
+    route: (v.route || []).map(pt => [pt[0] + latOffset, pt[1] + lngOffset])
+  }));
+
+  const localDemoCenters = demoCenters.map(c => ({
+    ...c,
+    lat: c.lat + latOffset,
+    lng: c.lng + lngOffset
+  }));
 
   // Try to load real data, fall back to demo data
   useEffect(() => {
@@ -95,7 +124,7 @@ export default function LiveMapPage() {
 
   // Merge real + demo data
   const allDonations = [
-    ...demoDonations,
+    ...localDemoDonations,
     ...foods.filter(f => f.location?.lat).map((f, i) => ({
       id: `real-${i}`,
       lat: f.location.lat,
@@ -109,7 +138,7 @@ export default function LiveMapPage() {
   ];
 
   const allVolunteers = [
-    ...demoVolunteers,
+    ...localDemoVolunteers,
     ...deliveries.filter(d => d.volunteerId && d.pickupLocation?.lat).map((d, i) => ({
       id: `real-vol-${i}`,
       lat: d.pickupLocation.lat,
@@ -139,9 +168,25 @@ export default function LiveMapPage() {
     <div className="livemap-page">
       <div className="livemap-header">
         <div>
-          <h1 className="livemap-title">
-            <span className="livemap-pulse" key={pulseKey}></span>
-            🗺️ {t('liveMapPageTitle')}
+          <h1 className="livemap-title" style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            <span>
+              <span className="livemap-pulse" key={pulseKey}></span>
+              🗺️ {t('liveMapPageTitle')}
+            </span>
+            <button 
+              className="eco-btn eco-btn-primary" 
+              style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
+              onClick={async () => {
+                if (user && updateLiveLocation) {
+                  // Uses the robust AuthContext method (GPS with IP Fallback)
+                  await updateLiveLocation(user);
+                  alert("Locating via GPS or IP Fallback... Map will re-center shortly.");
+                  setTimeout(() => window.location.reload(), 2000);
+                }
+              }}
+            >
+              📍 Locate Me
+            </button>
           </h1>
           <p className="livemap-subtitle">{t('liveMapPageSubtitle')}</p>
         </div>
@@ -176,10 +221,20 @@ export default function LiveMapPage() {
         ))}
       </div>
 
+      {/* Current Location Display */}
+      <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#fef2f2', borderRadius: '12px', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <span style={{ fontSize: '1.25rem' }}>📍</span>
+        <div>
+          <strong style={{ color: '#b91c1c', display: 'block', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Your Current Location</strong>
+          <span style={{ color: '#7f1d1d', fontWeight: '500' }}>{user?.location?.address || 'Locating... (Click Locate Me)'}</span>
+        </div>
+      </div>
+
       {/* Map */}
       <div className="livemap-container">
         <MapContainer
-          center={[12.9716, 77.5946]}
+          key={`${mapCenter[0]}-${mapCenter[1]}`}
+          center={mapCenter}
           zoom={12}
           style={{ height: '500px', width: '100%', borderRadius: '16px' }}
           scrollWheelZoom={true}
@@ -188,6 +243,18 @@ export default function LiveMapPage() {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+
+          {/* User Location Marker (Red) */}
+          {user?.location?.lat && user?.location?.lng && (
+            <Marker position={[user.location.lat, user.location.lng]} icon={icons.drop}>
+              <Popup>
+                <div style={{ minWidth: '150px' }}>
+                  <strong style={{ color: '#ef4444', fontSize: '1rem' }}>📍 You are here</strong><br />
+                  <span style={{ color: '#666', fontSize: '0.85rem' }}>{user.location.address}</span>
+                </div>
+              </Popup>
+            </Marker>
+          )}
 
           {/* Donation Markers */}
           {(filter === 'all' || filter === 'donations') && allDonations.map((d) => (
@@ -228,7 +295,7 @@ export default function LiveMapPage() {
           ))}
 
           {/* Distribution Center Markers */}
-          {(filter === 'all' || filter === 'centers') && demoCenters.map((c) => (
+          {(filter === 'all' || filter === 'centers') && localDemoCenters.map((c) => (
             <Marker key={`ctr-${c.id}`} position={[c.lat, c.lng]} icon={icons.center}>
               <Popup>
                 <div style={{ minWidth: '180px' }}>
