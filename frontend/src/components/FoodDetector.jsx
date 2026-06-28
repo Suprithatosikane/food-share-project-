@@ -1,14 +1,12 @@
 import { useState, useRef } from 'react';
 
 /**
- * FoodDetector — AI-based food type detection from uploaded images.
- * Uses real canvas-based image analysis (pixel color extraction, HSL analysis, dominant color profiling)
- * combined with filename semantic hints, and a manual human-in-the-loop correction fallback.
+ * FoodDetector — AI-based food type, freshness, and servings detection from uploaded images.
+ * Uses canvas-based pixel analysis to extract color features and run a heuristic scoring engine.
  */
 
 // ============ COLOR UTILITIES ============
 
-/** Convert RGB (0-255) to HSL (h: 0-360, s: 0-100, l: 0-100) */
 function rgbToHsl(r, g, b) {
   r /= 255; g /= 255; b /= 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
@@ -28,10 +26,6 @@ function rgbToHsl(r, g, b) {
 
 // ============ IMAGE FEATURE EXTRACTION ============
 
-/**
- * Draw image onto a canvas, read every pixel, and compute a feature vector
- * describing the image's color composition.
- */
 function extractImageFeatures(imgElement) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -43,13 +37,12 @@ function extractImageFeatures(imgElement) {
   const { data } = ctx.getImageData(0, 0, SIZE, SIZE);
   const totalPixels = SIZE * SIZE;
 
-  // Accumulators
   let hueSum = 0, satSum = 0, lightSum = 0;
   let warmCount = 0, coolCount = 0, greenCount = 0;
   let whiteCount = 0, darkCount = 0;
   let yellowCount = 0, orangeCount = 0, redCount = 0, brownCount = 0;
   const hueBins = new Array(36).fill(0);
-  let chromaPixels = 0; // pixels with meaningful color (saturation > threshold)
+  let chromaPixels = 0;
   let rSum = 0, gSum = 0, bSum = 0;
 
   for (let i = 0; i < data.length; i += 4) {
@@ -60,7 +53,6 @@ function extractImageFeatures(imgElement) {
     satSum += s;
     lightSum += l;
 
-    // Only analyse hue for sufficiently saturated (chromatic) pixels
     if (s > 10) {
       hueSum += h;
       hueBins[Math.floor(h / 10) % 36]++;
@@ -72,17 +64,15 @@ function extractImageFeatures(imgElement) {
       if (h >= 0 && h < 20)    redCount++;
       if (h >= 80 && h < 170)  greenCount++;
       if (h >= 190 && h < 280) coolCount++;
-      if (h >= 15 && h < 45 && s < 55 && l > 20 && l < 60) brownCount++;
+      if (h >= 15 && h < 45 && s < 55 && l > 15 && l < 50) brownCount++;
     }
 
-    // Lenient check for white/beige/cream under indoor lighting (low saturation, medium-high lightness)
     if (s < 24 && l > 55) whiteCount++;
     if (l < 25) darkCount++;
   }
 
-  const cp = chromaPixels || 1; // avoid division by zero
+  const cp = chromaPixels || 1;
 
-  // Shannon entropy over hue bins → measures colour diversity
   let colorDiversity = 0;
   for (const bin of hueBins) {
     if (bin > 0) {
@@ -113,24 +103,27 @@ function extractImageFeatures(imgElement) {
 
 // ============ SCORING HELPERS ============
 
-/** Full weight when value is inside [min, max]; decays linearly outside. */
 const R = (val, min, max, w) => {
   if (val >= min && val <= max) return w;
   const d = val < min ? min - val : val - max;
   return Math.max(0, w * (1 - d / 40));
 };
 
-/** Full weight when value ≥ threshold; proportional below. */
 const A = (val, thr, w) => (val >= thr ? w : w * Math.max(0, val / thr));
-
-/** Full weight when value ≤ threshold; proportional above. */
 const B = (val, thr, w) => (val <= thr ? w : w * Math.max(0, thr / val));
 
 // ============ FOOD DATABASE ============
 
 const FOOD_DB = [
   {
-    type: 'Upma', category: 'South Indian Breakfast', emoji: '🥣', servings: '10-15',
+    type: 'Mixed Fruits', category: 'Fruits', emoji: '🍎',
+    score: f =>
+      A(f.colorDiversity, 2.5, 25) + A(f.avgSat, 22, 20) +
+      A(f.redRatio, 0.03, 15) + A(f.greenRatio, 0.03, 15) +
+      A(f.yellowRatio, 0.03, 15) + B(f.whiteRatio, 0.45, 10),
+  },
+  {
+    type: 'Upma', category: 'South Indian Breakfast', emoji: '🥣',
     score: f =>
       R(f.avgHue, 35, 68, 15) + A(f.whiteRatio, 0.35, 25) +
       B(f.avgSat, 22, 20) + R(f.avgLight, 52, 78, 15) +
@@ -138,40 +131,40 @@ const FOOD_DB = [
       B(f.colorDiversity, 2.5, 8) + B(f.darkRatio, 0.15, 10),
   },
   {
-    type: 'Biryani', category: 'Main Course', emoji: '🍛', servings: '15-20',
+    type: 'Biryani', category: 'Main Course', emoji: '🍛',
     score: f =>
       R(f.avgHue, 18, 52, 15) + A(f.orangeRatio, 0.08, 15) +
       A(f.yellowRatio, 0.08, 10) + R(f.avgSat, 22, 62, 15) +
       A(f.colorDiversity, 2.2, 15) + R(f.avgLight, 30, 60, 15) +
-      A(f.warmRatio, 0.25, 10) + B(f.whiteRatio, 0.30, 5),
+      A(f.warmRatio, 0.25, 10) + B(f.whiteRatio, 0.30, 5) +
+      B(f.colorDiversity, 3.2, 5),
   },
   {
-    type: 'Rice & Sambar', category: 'South Indian', emoji: '🍚', servings: '25-30',
+    type: 'Rice & Sambar', category: 'South Indian', emoji: '🍚',
     score: f =>
       A(f.whiteRatio, 0.25, 20) + A(f.avgLight, 58, 20) +
       B(f.avgSat, 32, 15) + R(f.warmRatio, 0.04, 0.45, 10) +
-      A(f.colorDiversity, 1.0, 10) + B(f.greenRatio, 0.22, 10) +
-      B(f.darkRatio, 0.15, 10) + R(f.brownRatio, 0.01, 0.18, 5),
+      B(f.colorDiversity, 2.1, 15) + B(f.greenRatio, 0.12, 10) +
+      B(f.darkRatio, 0.15, 10),
   },
   {
-    type: 'Chapathi & Dal', category: 'North Indian', emoji: '🫓', servings: '20-25',
+    type: 'Chapathi & Dal', category: 'North Indian', emoji: '🫓',
     score: f =>
       R(f.avgHue, 18, 42, 18) + A(f.brownRatio, 0.12, 18) +
       R(f.avgSat, 22, 45, 12) + R(f.avgLight, 38, 62, 12) +
       A(f.warmRatio, 0.25, 12) + B(f.greenRatio, 0.12, 10) +
-      B(f.whiteRatio, 0.20, 8) + R(f.colorDiversity, 1.5, 3.0, 10),
+      B(f.whiteRatio, 0.20, 8) + B(f.colorDiversity, 2.2, 10),
   },
   {
-    type: 'Dosa & Chutney', category: 'South Indian', emoji: '🥞', servings: '30-35',
+    type: 'Dosa & Chutney', category: 'South Indian', emoji: '🥞',
     score: f =>
       R(f.avgHue, 18, 40, 15) + A(f.brownRatio, 0.08, 15) +
       R(f.avgSat, 18, 40, 12) + R(f.avgLight, 42, 68, 12) +
       A(f.greenRatio, 0.05, 12) + A(f.warmRatio, 0.15, 10) +
-      R(f.colorDiversity, 1.8, 3.5, 12) + B(f.darkRatio, 0.18, 6) +
-      B(f.whiteRatio, 0.30, 6),
+      B(f.colorDiversity, 2.5, 10) + B(f.whiteRatio, 0.30, 6),
   },
   {
-    type: 'Idli & Vada', category: 'South Indian Breakfast', emoji: '🔵', servings: '20-25',
+    type: 'Idli & Vada', category: 'South Indian Breakfast', emoji: '🔵',
     score: f =>
       A(f.whiteRatio, 0.40, 22) + A(f.avgLight, 68, 20) +
       B(f.avgSat, 18, 18) + B(f.colorDiversity, 1.8, 12) +
@@ -179,15 +172,7 @@ const FOOD_DB = [
       B(f.darkRatio, 0.10, 5) + B(f.brownRatio, 0.06, 5),
   },
   {
-    type: 'Mixed Fruits', category: 'Fruits', emoji: '🍎', servings: '10-15',
-    score: f =>
-      A(f.colorDiversity, 3.0, 22) + A(f.avgSat, 35, 18) +
-      R(f.avgLight, 40, 70, 12) + A(f.redRatio, 0.06, 12) +
-      A(f.greenRatio, 0.06, 12) + A(f.yellowRatio, 0.06, 10) +
-      B(f.whiteRatio, 0.25, 8) + B(f.darkRatio, 0.15, 6),
-  },
-  {
-    type: 'Vegetable Curry', category: 'Main Course', emoji: '🥘', servings: '15-20',
+    type: 'Vegetable Curry', category: 'Main Course', emoji: '🥘',
     score: f =>
       A(f.greenRatio, 0.12, 20) + R(f.avgHue, 50, 130, 18) +
       R(f.avgSat, 22, 55, 14) + R(f.avgLight, 30, 58, 12) +
@@ -195,7 +180,7 @@ const FOOD_DB = [
       A(f.warmRatio, 0.05, 8) + B(f.darkRatio, 0.20, 8),
   },
   {
-    type: 'Bread & Bakery', category: 'Bakery', emoji: '🍞', servings: '20-25',
+    type: 'Bread & Bakery', category: 'Bakery', emoji: '🍞',
     score: f =>
       R(f.avgHue, 18, 38, 18) + A(f.brownRatio, 0.08, 18) +
       B(f.avgSat, 35, 14) + R(f.avgLight, 35, 60, 14) +
@@ -203,7 +188,7 @@ const FOOD_DB = [
       B(f.whiteRatio, 0.30, 8) + B(f.darkRatio, 0.20, 6),
   },
   {
-    type: 'Snacks & Sweets', category: 'Snacks', emoji: '🍪', servings: '40-50',
+    type: 'Snacks & Sweets', category: 'Snacks', emoji: '🍪',
     score: f =>
       R(f.avgHue, 20, 48, 16) + R(f.avgSat, 18, 50, 14) +
       R(f.avgLight, 40, 65, 14) + A(f.warmRatio, 0.20, 12) +
@@ -213,27 +198,74 @@ const FOOD_DB = [
   },
 ];
 
+// ============ DYNAMIC ASSESSMENT ENGINE ============
+
+/** Assess freshness from bruising/brown decay ratio vs saturation */
+function estimateFreshness(f) {
+  // Decay factor: high brown ratio and dark spots relative to saturated color
+  const decayFactor = f.brownRatio * 2.5 + f.darkRatio * 1.5;
+  
+  let baseFreshness = 94;
+
+  // Subtract for bruising / rotting spots
+  if (decayFactor > 0.15) {
+    const penalty = Math.round((decayFactor - 0.15) * 140);
+    baseFreshness -= penalty;
+  }
+
+  // Low saturation mid-tones can indicate oxidation/wilting
+  if (f.avgSat < 18) {
+    baseFreshness -= 10;
+  }
+
+  return Math.min(98, Math.max(12, baseFreshness));
+}
+
+/** Assess servings dynamically based on actual food surface coverage */
+function estimateServings(f, foodType, freshness) {
+  if (freshness < 45) {
+    return '0-1 (Spoiled/Rotten)';
+  }
+
+  let baseVal = 10;
+  switch (foodType) {
+    case 'Mixed Fruits': baseVal = 4; break;
+    case 'Upma': baseVal = 12; break;
+    case 'Biryani': baseVal = 16; break;
+    case 'Rice & Sambar': baseVal = 20; break;
+    case 'Chapathi & Dal': baseVal = 12; break;
+    case 'Idli & Vada': baseVal = 10; break;
+    default: baseVal = 8;
+  }
+
+  // Estimate what percentage of the canvas is actual food (exclude white plates and dark background shadow)
+  const foodRatio = Math.max(0.15, 1.0 - (f.whiteRatio + f.darkRatio));
+  const dynamicServings = Math.round(baseVal * foodRatio);
+
+  if (dynamicServings <= 2) return '1-2 servings';
+  if (dynamicServings <= 5) return '3-5 servings';
+  return `${dynamicServings - 2}-${dynamicServings + 2} servings`;
+}
+
 // ============ CLASSIFICATION ============
 
-/** Score every food profile and return the best match + alternatives. */
 function classifyFood(features, fileName = '') {
   const lowerName = fileName.toLowerCase();
 
   const results = FOOD_DB.map(food => {
     let rawScore = food.score(features);
 
-    // AI Semantic Booster: if the uploaded filename has the food name, boost it to 100% confidence
+    // Keyword booster
     const isMatched = lowerName.includes(food.type.toLowerCase()) || 
                       food.type.toLowerCase().split(' ').some(w => w.length > 3 && lowerName.includes(w));
     if (isMatched) {
-      rawScore += 120; // massive boost
+      rawScore += 120;
     }
 
     return {
       type: food.type,
       category: food.category,
       emoji: food.emoji,
-      servings: food.servings,
       rawScore: rawScore,
     };
   });
@@ -243,34 +275,21 @@ function classifyFood(features, fileName = '') {
   const top = results[0];
   const maxPossible = 100;
 
-  // Map raw score to a realistic confidence (75–96 %)
-  const confidence = Math.min(96, Math.max(75, Math.round((top.rawScore / maxPossible) * 100)));
   const freshness  = estimateFreshness(features);
+  const confidence = Math.min(96, Math.max(72, Math.round((top.rawScore / maxPossible) * 100)));
+  const servings   = estimateServings(features, top.type, freshness);
 
   return {
     ...top,
     confidence,
     freshness,
+    servings,
     alternatives: results.slice(1, 4).map(r => ({
       type: r.type,
       emoji: r.emoji,
-      confidence: Math.min(confidence - 4, Math.max(58, Math.round((r.rawScore / maxPossible) * 100))),
+      confidence: Math.min(confidence - 4, Math.max(52, Math.round((r.rawScore / maxPossible) * 100))),
     })),
   };
-}
-
-/** Estimate freshness from colour vibrancy (saturation + brightness). */
-function estimateFreshness(f) {
-  let score = 72;
-  if (f.avgSat > 30) score += 10;
-  else if (f.avgSat > 20) score += 5;
-  else score -= 4;
-  if (f.avgLight > 38 && f.avgLight < 72) score += 8;
-  else score -= 3;
-  if (f.darkRatio < 0.10) score += 5;
-  else score -= 5;
-  if (f.colorDiversity > 1.5) score += 3;
-  return Math.min(98, Math.max(58, score));
 }
 
 // ============ REACT COMPONENT ============
@@ -281,6 +300,7 @@ export default function FoodDetector({ onDetect }) {
   const [detecting, setDetecting] = useState(false);
   const [result, setResult]     = useState(null);
   const [stage, setStage]       = useState('');
+  const [features, setFeatures] = useState(null);
   const fileRef = useRef(null);
 
   const handleImageUpload = (e) => {
@@ -298,21 +318,19 @@ export default function FoodDetector({ onDetect }) {
     if (!image) return;
     setDetecting(true);
 
-    // 1 — Load image into an HTMLImageElement for canvas
     setStage('Loading image...');
     const img = new Image();
     img.src = preview;
     await new Promise(resolve => { img.onload = resolve; });
     await delay(400);
 
-    // 2 — Extract pixel-level colour features
     setStage('Extracting color features...');
-    const features = extractImageFeatures(img);
+    const extracted = extractImageFeatures(img);
+    setFeatures(extracted);
     await delay(500);
 
-    // 3 — Score against food profiles with filename hint booster
     setStage('Classifying food type...');
-    const detected = classifyFood(features, image?.name || '');
+    const detected = classifyFood(extracted, image?.name || '');
     await delay(400);
 
     setStage('Done ✅');
@@ -387,9 +405,13 @@ export default function FoodDetector({ onDetect }) {
             <span className="detector-result-emoji">{result.emoji}</span>
             <div>
               <h4>{result.type}</h4>
-              <span className="detector-result-category">{result.category}</span>
+              <span className="detector-result-category">
+                {result.freshness < 45 ? '⚠️ Quality Alert' : result.category}
+              </span>
             </div>
-            <span className="detector-confidence">{result.confidence}%</span>
+            <span className="detector-confidence" style={{ color: result.freshness < 45 ? '#ef4444' : '' }}>
+              {result.confidence}%
+            </span>
           </div>
 
           <div className="detector-result-grid">
@@ -401,18 +423,22 @@ export default function FoodDetector({ onDetect }) {
                   style={{
                     width: `${result.freshness}%`,
                     background:
-                      result.freshness > 85 ? '#22c55e'
-                      : result.freshness > 70 ? '#f59e0b'
+                      result.freshness > 80 ? '#22c55e'
+                      : result.freshness > 50 ? '#f59e0b'
                       : '#ef4444',
                   }}
                 ></div>
               </div>
-              <span className="detector-metric-val">{result.freshness}%</span>
+              <span className="detector-metric-val" style={{ color: result.freshness < 50 ? '#ef4444' : '', fontWeight: '600' }}>
+                {result.freshness}% {result.freshness < 45 ? '(Spoiled 🛑)' : '(Fresh ✅)'}
+              </span>
             </div>
 
             <div className="detector-metric">
               <span className="detector-metric-label">Est. Servings</span>
-              <span className="detector-metric-val">📦 {result.servings}</span>
+              <span className="detector-metric-val" style={{ color: result.freshness < 45 ? '#ef4444' : '', fontWeight: '600' }}>
+                📦 {result.servings}
+              </span>
             </div>
 
             <div className="detector-metric">
@@ -421,7 +447,7 @@ export default function FoodDetector({ onDetect }) {
             </div>
           </div>
 
-          {/* ── Also-detected alternatives ── */}
+          {/* Also possible options */}
           {result.alternatives && result.alternatives.length > 0 && (
             <div style={{
               marginTop: '0.75rem', padding: '0.6rem 0.8rem',
@@ -441,7 +467,7 @@ export default function FoodDetector({ onDetect }) {
             </div>
           )}
 
-          {/* ── Human-in-the-loop Correction Dropdown ── */}
+          {/* human-in-the-loop dropdown */}
           <div style={{
             marginTop: '0.75rem', padding: '0.6rem 0.8rem',
             background: 'var(--card-bg, #f8f9fa)', borderRadius: '8px',
@@ -457,8 +483,9 @@ export default function FoodDetector({ onDetect }) {
                 if (selected) {
                   const updated = {
                     ...selected,
-                    confidence: 100, // human-verified
+                    confidence: 100,
                     freshness: result.freshness,
+                    servings: estimateServings(features, selected.type, result.freshness),
                     alternatives: []
                   };
                   setResult(updated);
@@ -492,5 +519,4 @@ export default function FoodDetector({ onDetect }) {
   );
 }
 
-// Small promise-based delay helper
 const delay = ms => new Promise(r => setTimeout(r, ms));
