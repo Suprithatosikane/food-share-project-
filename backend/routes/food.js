@@ -164,7 +164,7 @@ router.post('/detect', protect, async (req, res) => {
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
 
     // Call Gemini 1.5 Flash API
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
     const prompt = `Identify the food item in the image. You must output ONLY a valid JSON object in this exact format:
 {
@@ -213,7 +213,13 @@ router.post('/detect', protect, async (req, res) => {
       return res.json({ useClientFallback: true, error: 'Empty response from Gemini' });
     }
 
-    const resultObj = JSON.parse(textResult.trim());
+    // Safe JSON parser to strip any markdown block wraps
+    let cleanText = textResult.trim();
+    if (cleanText.startsWith('```')) {
+      cleanText = cleanText.replace(/^```(?:json)?/i, '').replace(/```$/s, '').trim();
+    }
+
+    const resultObj = JSON.parse(cleanText);
     res.json({ success: true, result: resultObj });
 
   } catch (error) {
