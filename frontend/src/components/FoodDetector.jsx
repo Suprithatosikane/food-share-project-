@@ -303,17 +303,17 @@ export default function FoodDetector({ onDetect }) {
     const img = new Image();
     img.src = preview;
     await new Promise(resolve => { img.onload = resolve; });
-    await delay(400);
+    await delay(50);
 
     // 2 — Extract pixel-level colour features
     setStage('Extracting color features...');
     const features = extractImageFeatures(img);
-    await delay(500);
+    await delay(50);
 
     // 3 — Score against food profiles with filename hint booster
     setStage('Classifying food type...');
     const detected = classifyFood(features, image?.name || '');
-    await delay(400);
+    await delay(50);
 
     setStage('Done ✅');
     setResult(detected);

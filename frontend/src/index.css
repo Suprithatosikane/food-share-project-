@@ -1434,99 +1434,69 @@ img {
 
 /* ========== EcoFeed Hero Section ========== */
 .eco-hero {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  max-width: var(--container);
-  margin: 0 auto;
+  justify-content: center;
+  text-align: center;
   padding: 5rem 2rem;
-  gap: 4rem;
-  min-height: 80vh;
+  min-height: 100vh;
+  margin-top: -65px; /* Offset the navbar height to cover entire screen */
+  background: url('/hero-children.jpg') no-repeat center center;
+  background-size: cover;
+  background-attachment: fixed; /* Parallax effect */
+  z-index: 1;
+}
+
+.eco-hero::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6); /* Dark overlay for text readability */
+  z-index: -1;
 }
 
 .eco-hero-content {
-  flex: 1;
-  max-width: 550px;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .eco-hero-title {
   font-family: 'Playfair Display', Georgia, serif;
-  font-size: 4rem;
+  font-size: 4.5rem;
   font-weight: 800;
   line-height: 1.1;
-  color: var(--text);
+  color: #ffffff;
   margin-bottom: 1.5rem;
+  text-shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
 
 .eco-italic {
   font-style: italic;
-  color: var(--text);
+  color: #ffffff;
 }
 
 .eco-green {
-  color: var(--primary);
+  color: var(--primary-light);
   font-style: normal;
 }
 
 .eco-hero-subtitle {
-  font-size: 1.1rem;
-  color: var(--text-secondary);
+  font-size: 1.25rem;
+  color: #f1f5f9;
   line-height: 1.7;
   margin-bottom: 2.5rem;
-  max-width: 480px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.5);
 }
 
 .eco-hero-image {
-  flex: 1;
-  display: flex;
-  justify-content: center;
+  display: none; /* Hide the old component if any remnants exist */
 }
 
-.eco-image-card {
-  width: 100%;
-  max-width: 480px;
-  aspect-ratio: 4/3;
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
-  transition: transform 0.4s ease;
-}
-
-.eco-image-card:hover {
-  transform: scale(1.02);
-}
-
-.eco-image-placeholder {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: white;
-}
-
-.eco-image-children {
-  background: linear-gradient(135deg, #fb923c, #f97316, #ea580c);
-}
-
-.eco-big-emoji {
-  font-size: 5rem;
-  margin-bottom: 1rem;
-  animation: bounce-gentle 3s ease-in-out infinite;
-}
-
-@keyframes bounce-gentle {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-.eco-image-placeholder p {
-  font-size: 1.1rem;
-  font-weight: 600;
-  opacity: 0.9;
-}
 
 /* ========== Auth Modal ========== */
 .auth-modal-overlay {
@@ -2168,6 +2138,131 @@ img {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* ========== Fullscreen Overlay & Click Zoom Styles ========== */
+.eco-image-card {
+  position: relative;
+  cursor: zoom-in;
+}
+
+.eco-image-zoom-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s ease;
+  border-radius: 20px;
+  pointer-events: none;
+}
+
+.eco-image-card:hover .eco-image-zoom-overlay {
+  opacity: 1;
+}
+
+.eco-image-zoom-icon {
+  color: white;
+  font-size: 2.5rem;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s ease;
+}
+
+.eco-image-card:hover .eco-image-zoom-icon {
+  transform: scale(1.1);
+}
+
+.fullscreen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(10, 10, 12, 0.95);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.fullscreen-content {
+  position: relative;
+  max-width: 90%;
+  max-height: 90%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fullscreen-img {
+  max-width: 100%;
+  max-height: 90vh;
+  border-radius: 12px;
+  object-fit: contain;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.55);
+}
+
+.fullscreen-close-btn {
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 2rem;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(5px);
+}
+
+.fullscreen-close-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Adjust close button on small screens */
+@media (max-width: 768px) {
+  .fullscreen-close-btn {
+    top: 15px;
+    right: 15px;
+    background: rgba(0, 0, 0, 0.5);
+    border: none;
+  }
 }
 
 /* ========================================

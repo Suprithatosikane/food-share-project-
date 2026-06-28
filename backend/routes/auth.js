@@ -153,4 +153,39 @@ router.get('/me', protect, async (req, res) => {
   });
 });
 
+/**
+ * PUT /api/auth/location
+ * Update authenticated user's location coordinates and address
+ */
+router.put('/location', protect, async (req, res) => {
+  try {
+    const { address, lat, lng } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.location = {
+      address: address || user.location.address,
+      lat: lat !== undefined ? lat : user.location.lat,
+      lng: lng !== undefined ? lng : user.location.lng,
+    };
+
+    await user.save();
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      location: user.location,
+    });
+  } catch (error) {
+    console.error('Update location error:', error);
+    res.status(500).json({ message: 'Server error during location updates' });
+  }
+});
+
 module.exports = router;
