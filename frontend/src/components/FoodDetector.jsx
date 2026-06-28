@@ -125,10 +125,9 @@ const FOOD_DB = [
   {
     type: 'Upma', category: 'South Indian Breakfast', emoji: '🥣',
     score: f =>
-      R(f.avgHue, 35, 68, 15) + A(f.whiteRatio, 0.35, 25) +
-      B(f.avgSat, 22, 20) + R(f.avgLight, 52, 78, 15) +
-      A(f.yellowRatio, 0.05, 12) + A(f.greenRatio, 0.02, 10) +
-      B(f.colorDiversity, 2.5, 8) + B(f.darkRatio, 0.15, 10),
+      R(f.avgHue, 22, 65, 20) + A(f.avgLight, 48, 25) +
+      B(f.avgSat, 26, 20) + B(f.brownRatio, 0.04, 25) +
+      B(f.colorDiversity, 2.2, 10),
   },
   {
     type: 'Biryani', category: 'Main Course', emoji: '🍛',
@@ -150,10 +149,10 @@ const FOOD_DB = [
   {
     type: 'Chapathi & Dal', category: 'North Indian', emoji: '🫓',
     score: f =>
-      R(f.avgHue, 18, 42, 18) + A(f.brownRatio, 0.12, 18) +
-      R(f.avgSat, 22, 45, 12) + R(f.avgLight, 38, 62, 12) +
-      A(f.warmRatio, 0.25, 12) + B(f.greenRatio, 0.12, 10) +
-      B(f.whiteRatio, 0.20, 8) + B(f.colorDiversity, 2.2, 10),
+      R(f.avgHue, 18, 42, 18) + A(f.brownRatio, 0.08, 22) +
+      R(f.avgSat, 22, 45, 12) + R(f.avgLight, 35, 60, 12) +
+      A(f.warmRatio, 0.20, 12) + B(f.greenRatio, 0.12, 10) +
+      B(f.whiteRatio, 0.25, 8) + B(f.colorDiversity, 2.2, 10),
   },
   {
     type: 'Dosa & Chutney', category: 'South Indian', emoji: '🥞',
@@ -223,7 +222,7 @@ function estimateFreshness(f) {
 
 /** Assess servings dynamically based on actual food surface coverage */
 function estimateServings(f, foodType, freshness) {
-  if (freshness < 45) {
+  if (freshness < 50) {
     return '0-1 (Spoiled/Rotten)';
   }
 
@@ -406,10 +405,10 @@ export default function FoodDetector({ onDetect }) {
             <div>
               <h4>{result.type}</h4>
               <span className="detector-result-category">
-                {result.freshness < 45 ? '⚠️ Quality Alert' : result.category}
+                {result.freshness < 50 ? '⚠️ Quality Alert' : result.category}
               </span>
             </div>
-            <span className="detector-confidence" style={{ color: result.freshness < 45 ? '#ef4444' : '' }}>
+            <span className="detector-confidence" style={{ color: result.freshness < 50 ? '#ef4444' : '' }}>
               {result.confidence}%
             </span>
           </div>
@@ -430,13 +429,13 @@ export default function FoodDetector({ onDetect }) {
                 ></div>
               </div>
               <span className="detector-metric-val" style={{ color: result.freshness < 50 ? '#ef4444' : '', fontWeight: '600' }}>
-                {result.freshness}% {result.freshness < 45 ? '(Spoiled 🛑)' : '(Fresh ✅)'}
+                {result.freshness}% {result.freshness > 80 ? '(Fresh ✅)' : result.freshness > 50 ? '(Stale ⚠️)' : '(Spoiled 🛑)'}
               </span>
             </div>
 
             <div className="detector-metric">
               <span className="detector-metric-label">Est. Servings</span>
-              <span className="detector-metric-val" style={{ color: result.freshness < 45 ? '#ef4444' : '', fontWeight: '600' }}>
+              <span className="detector-metric-val" style={{ color: result.freshness < 50 ? '#ef4444' : '', fontWeight: '600' }}>
                 📦 {result.servings}
               </span>
             </div>
