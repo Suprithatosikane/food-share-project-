@@ -121,7 +121,8 @@ const FOOD_DB = [
     score: f =>
       A(f.colorDiversity, 2.5, 25) + A(f.avgSat, 22, 20) +
       A(f.redRatio, 0.03, 15) + A(f.greenRatio, 0.03, 15) +
-      A(f.yellowRatio, 0.03, 15) + B(f.whiteRatio, 0.45, 10),
+      A(f.yellowRatio, 0.03, 15) + B(f.whiteRatio, 0.45, 10) +
+      (f.greenRatio > 0.02 && f.redRatio > 0.02 && f.yellowRatio > 0.02 ? 30 : 0),
   },
   {
     type: 'Upma', category: 'South Indian Breakfast', emoji: '🥣',
@@ -137,7 +138,8 @@ const FOOD_DB = [
       A(f.yellowRatio, 0.08, 10) + R(f.avgSat, 22, 62, 15) +
       A(f.colorDiversity, 2.2, 15) + R(f.avgLight, 30, 60, 15) +
       A(f.warmRatio, 0.25, 10) + B(f.whiteRatio, 0.30, 5) +
-      B(f.colorDiversity, 3.2, 5),
+      B(f.colorDiversity, 3.2, 5) + B(f.greenRatio, 0.02, 15) +
+      B(f.redRatio, 0.02, 15),
   },
   {
     type: 'Rice & Sambar', category: 'South Indian', emoji: '🍚',

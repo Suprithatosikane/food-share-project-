@@ -142,7 +142,7 @@ router.delete('/:id', protect, authorize('donor'), async (req, res) => {
  * POST /api/food/detect
  * Analyze food image using Gemini AI API (if key is set)
  */
-router.post('/detect', protect, async (req, res) => {
+router.post('/detect', async (req, res) => {
   try {
     const { imageBase64 } = req.body;
     if (!imageBase64) {
