@@ -264,7 +264,7 @@ export default function DonorDashboard() {
           🗺️ Live Tracking
         </button>
         <button className={`tab ${activeTab === 'ai' ? 'active' : ''}`} onClick={() => setActiveTab('ai')}>
-          智能 AI 工具
+          🤖 AI Tools
         </button>
       </div>
 
