@@ -381,10 +381,11 @@ export default function FoodDetector({ onDetect }) {
     await delay(500);
 
     setStage('Classifying food type...');
-    const detected = classifyFood(features, image?.name || '');
-    await delay(50);
-    const detected = classifyFood(extracted, image?.name || '');
-    await delay(400);
+
+// FIX: use only extracted features (avoid duplicate declaration)
+const detected = classifyFood(extracted, image?.name || '');
+
+await delay(400);
 
     // Fallback status mappings
     detected.isFood = true;
