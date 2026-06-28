@@ -36,6 +36,10 @@ const deliverySchema = new mongoose.Schema({
     enum: ['pending', 'accepted', 'picked', 'delivered'],
     default: 'pending',
   },
+  requestedQuantity: {
+    type: String,
+    default: '',
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Delivery', deliverySchema);

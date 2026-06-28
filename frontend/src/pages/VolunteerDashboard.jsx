@@ -216,6 +216,7 @@ export default function VolunteerDashboard() {
                 <div key={del._id} className="delivery-card">
                   <div className="delivery-info">
                     <h4>{del.foodId?.foodType || 'Food Item'}</h4>
+                    <p>📦 Quantity: {del.requestedQuantity || del.foodId?.quantity}</p>
                     <p>📍 Pickup: {del.pickupLocation?.address || 'N/A'}</p>
                     <p>📍 Drop: {del.dropLocation?.address || 'N/A'}</p>
                     {del.foodId?.donorId && <p>👤 Donor: {del.foodId.donorId.name}</p>}
@@ -242,6 +243,7 @@ export default function VolunteerDashboard() {
                 <div key={del._id} className="delivery-card active-delivery">
                   <div className="delivery-info">
                     <h4>{del.foodId?.foodType || 'Food Item'}</h4>
+                    <p>📦 Quantity: {del.requestedQuantity || del.foodId?.quantity}</p>
                     <p>📍 Pickup: {del.pickupLocation?.address || 'N/A'}</p>
                     <p>📍 Drop: {del.dropLocation?.address || 'N/A'}</p>
                     {del.foodId?.donorId && (
@@ -278,6 +280,7 @@ export default function VolunteerDashboard() {
                 <div key={del._id} className="delivery-card completed-delivery">
                   <div className="delivery-info">
                     <h4>{del.foodId?.foodType || 'Food Item'}</h4>
+                    <p>📦 Quantity: {del.requestedQuantity || del.foodId?.quantity}</p>
                     <p>📍 Pickup: {del.pickupLocation?.address || 'N/A'}</p>
                     <p>📍 Drop: {del.dropLocation?.address || 'N/A'}</p>
                   </div>

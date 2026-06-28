@@ -163,18 +163,48 @@ router.post('/detect', async (req, res) => {
     const mimeType = mimeMatch[1];
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
 
-    // Call Gemini 1.5 Flash API
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // Call Gemini 3.5 Flash API
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`;
     
-    const prompt = `Identify the food item in the image. You must output ONLY a valid JSON object in this exact format:
+    const prompt = `You are an expert Food Recognition and Freshness Analysis AI designed for a real-world food donation platform. Your responses must be accurate, conservative, and evidence-based.
+
+You must output ONLY a valid JSON object in this exact format:
 {
-  "type": "Upma" | "Biryani" | "Rice & Sambar" | "Chapathi & Dal" | "Dosa & Chutney" | "Idli & Vada" | "Mixed Fruits" | "Vegetable Curry" | "Bread & Bakery" | "Snacks & Sweets",
-  "category": "South Indian Breakfast" | "Main Course" | "South Indian" | "North Indian" | "Fruits" | "Bakery" | "Snacks",
-  "emoji": "🥣" | "🍛" | "🍚" | "🫓" | "🥞" | "🔵" | "🍎" | "🥘" | "🍞" | "🍪",
-  "confidence": number (70-100),
-  "freshness": number (0-100, calculate based on decay, bruising, oxidation, rot, bites, etc. If fruits are rotten/bitten/old, freshness must be below 40%),
-  "servings": "1-2 servings" | "3-5 servings" | "6-10 servings" | "0-1 (Spoiled/Rotten)"
-}`;
+  "isFood": boolean,
+  "isClearAndWellLit": boolean,
+  "rejectionReason": "not_food" | "blurry_or_poor_lighting" | "none",
+  "foodDetected": string,
+  "confidence": number,
+  "freshness": number,
+  "freshnessStatus": "Fresh" | "Moderately Fresh" | "Stale" | "Rotten",
+  "recommendation": "Safe for donation" | "Donate immediately" | "Consume soon" | "Not recommended for donation",
+  "reason": string,
+  "errorMessage": string
+}
+
+Step 1: Validate the Image
+- Determine whether the uploaded image contains food.
+- If the image contains a car, bike, laptop, mobile phone, human, building, pet, scenery, furniture, document, or any non-food object, set "isFood" to false, "rejectionReason" to "not_food", "confidence" to 0, "foodDetected" to "", and "errorMessage" to "❌ Invalid image. Please upload a clear image containing only food."
+
+Step 2: Check Image Quality
+- Reject the image if it is blurry, too dark, too bright, low resolution, or food is partially visible.
+- If rejected for quality, set "isClearAndWellLit" to false, "rejectionReason" to "blurry_or_poor_lighting", "confidence" to 0, "foodDetected" to "", and "errorMessage" to "⚠️ Image quality is insufficient. Please upload a clear, well-lit image of the food."
+
+Step 3: Identify the Exact Food
+- Carefully analyze the image. Return the exact food name (e.g. "Upma", "Chapati", "Dal", "Idli", "Dosa", "Pongal", "Lemon Rice", "Tomato Rice", "Biryani", "Puliyogare", "Curd Rice", "Sambar Rice", "Poha", "Apple", "Banana", "Orange", "Mango", etc.). Never label every rice dish as Biryani.
+- If the image is not food or quality is rejected, set "foodDetected" to "".
+
+Step 4: Confidence Validation
+- If confidence is below 90%, set "errorMessage" to "⚠️ Unable to confidently identify the food. Please upload a clearer image from the top or front angle."
+
+Step 5: Freshness Analysis
+- If food is detected, analyze colour, texture, moisture, mold, spots, damage, and sign of spoilage. Set "freshness" as percentage (0-100) and "freshnessStatus" as one of: "Fresh", "Moderately Fresh", "Stale", "Rotten".
+
+Step 6: Recommendation
+- Provide one recommendation (e.g., "Safe for donation", "Donate immediately", "Consume soon", "Not recommended for donation").
+
+Step 7: Never Hallucinate
+- Accuracy is more important than providing an answer. If uncertain, set confidence < 90.`;
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
@@ -208,8 +238,11 @@ router.post('/detect', async (req, res) => {
     }
 
     const data = await response.json();
+    console.log('Raw Gemini Response:', JSON.stringify(data, null, 2));
+
     const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!textResult) {
+      console.warn('Empty textResult in Gemini response');
       return res.json({ useClientFallback: true, error: 'Empty response from Gemini' });
     }
 
@@ -220,6 +253,20 @@ router.post('/detect', async (req, res) => {
     }
 
     const resultObj = JSON.parse(cleanText);
+
+    // Map fields for client compatibility
+    resultObj.type = resultObj.foodDetected;
+    
+    // Add emojis to status strings if they don't already have them
+    if (resultObj.freshnessStatus && !resultObj.freshnessStatus.match(/[✅⚠️❌🛑]/)) {
+      if (resultObj.freshnessStatus === 'Fresh') resultObj.freshnessStatus = 'Fresh ✅';
+      else if (resultObj.freshnessStatus === 'Moderately Fresh') resultObj.freshnessStatus = 'Moderately Fresh ⚠️';
+      else if (resultObj.freshnessStatus === 'Stale') resultObj.freshnessStatus = 'Stale ⚠️';
+      else if (resultObj.freshnessStatus === 'Rotten') resultObj.freshnessStatus = 'Rotten ❌';
+    }
+
+    resultObj.servings = resultObj.servings || '3-5 servings';
+
     res.json({ success: true, result: resultObj });
 
   } catch (error) {

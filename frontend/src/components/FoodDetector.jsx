@@ -303,6 +303,7 @@ export default function FoodDetector({ onDetect }) {
   const [result, setResult]     = useState(null);
   const [stage, setStage]       = useState('');
   const [features, setFeatures] = useState(null);
+  const [validationError, setValidationError] = useState(null);
   const fileRef = useRef(null);
 
   const handleImageUpload = (e) => {
@@ -310,6 +311,7 @@ export default function FoodDetector({ onDetect }) {
     if (!file) return;
     setImage(file);
     setResult(null);
+    setValidationError(null);
     setStage('');
     const reader = new FileReader();
     reader.onload = (ev) => setPreview(ev.target.result);
@@ -319,6 +321,8 @@ export default function FoodDetector({ onDetect }) {
   const detectFood = async () => {
     if (!image) return;
     setDetecting(true);
+    setValidationError(null);
+    setResult(null);
 
     try {
       setStage('Sending image to Gemini AI...');
@@ -326,6 +330,30 @@ export default function FoodDetector({ onDetect }) {
       
       if (response.data && response.data.success && response.data.result) {
         const detected = response.data.result;
+        
+        // Strict Guardrails Validation
+        if (detected.isFood === false) {
+          setValidationError("❌ Invalid image. Please upload a clear image containing only food.");
+          setResult(null);
+          setDetecting(false);
+          return;
+        }
+
+        if (detected.isClearAndWellLit === false) {
+          setValidationError("⚠️ Image quality is insufficient. Please upload a clear, well-lit image of the food.");
+          setResult(null);
+          setDetecting(false);
+          return;
+        }
+
+        if (detected.confidence < 90) {
+          setValidationError("⚠️ Unable to confidently identify the food. Please upload a clearer image from the top or front angle.");
+          setResult(null);
+          setDetecting(false);
+          return;
+        }
+
+        // Successfully validated
         setStage('Done ✅');
         setResult(detected);
         setDetecting(false);
@@ -354,6 +382,20 @@ export default function FoodDetector({ onDetect }) {
     const detected = classifyFood(extracted, image?.name || '');
     await delay(400);
 
+    // Fallback status mappings
+    detected.isFood = true;
+    detected.isClearAndWellLit = true;
+    detected.freshnessStatus = detected.freshness > 80 ? 'Fresh ✅' : detected.freshness > 50 ? 'Moderately Fresh ⚠️' : 'Rotten ❌';
+    detected.recommendation = detected.freshness > 50 ? 'Safe for donation.' : 'Do not donate.';
+
+    // Run same confidence checks on fallback
+    if (detected.confidence < 90) {
+      setValidationError("⚠️ Unable to confidently identify the food. Please upload a clearer image from the top or front angle.");
+      setResult(null);
+      setDetecting(false);
+      return;
+    }
+
     setStage('Done ✅');
     setResult(detected);
     setDetecting(false);
@@ -365,6 +407,7 @@ export default function FoodDetector({ onDetect }) {
     setImage(null);
     setPreview(null);
     setResult(null);
+    setValidationError(null);
     setStage('');
     if (fileRef.current) fileRef.current.value = '';
   };
@@ -399,16 +442,23 @@ export default function FoodDetector({ onDetect }) {
       </div>
 
       {preview && !result && (
-        <button className="detector-btn" onClick={detectFood} disabled={detecting}>
-          {detecting ? (
-            <>
-              <span className="detector-spinner"></span>
-              {stage}
-            </>
-          ) : (
-            <>🤖 Detect Food Type</>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+          <button className="detector-btn" onClick={detectFood} disabled={detecting}>
+            {detecting ? (
+              <>
+                <span className="detector-spinner"></span>
+                {stage}
+              </>
+            ) : (
+              <>🤖 Detect Food Type</>
+            )}
+          </button>
+          {validationError && (
+            <button className="detector-btn detector-btn-reset" onClick={resetDetector} style={{ marginTop: 0 }}>
+              🔄 Reset Upload
+            </button>
           )}
-        </button>
+        </div>
       )}
 
       {detecting && (
@@ -417,6 +467,23 @@ export default function FoodDetector({ onDetect }) {
             <div className="detector-progress-fill"></div>
           </div>
           <p className="detector-progress-text">🔍 {stage}</p>
+        </div>
+      )}
+
+      {validationError && (
+        <div className="animate-slide-down" style={{
+          marginTop: '1.25rem',
+          padding: '1.25rem',
+          borderRadius: '16px',
+          fontSize: '1rem',
+          fontWeight: '600',
+          textAlign: 'center',
+          background: '#fef2f2',
+          color: '#ef4444',
+          border: '1px solid #fee2e2',
+          boxShadow: '0 4px 12px rgba(239, 68, 68, 0.05)'
+        }}>
+          {validationError}
         </div>
       )}
 
@@ -433,6 +500,39 @@ export default function FoodDetector({ onDetect }) {
             <span className="detector-confidence" style={{ color: result.freshness < 50 ? '#ef4444' : '' }}>
               {result.confidence}%
             </span>
+          </div>
+
+          {/* Monospace Output Box matching requested parameters */}
+          <div style={{
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '1.25rem',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.6rem',
+            fontFamily: 'Outfit, sans-serif',
+            fontSize: '0.95rem',
+            color: '#1e293b',
+            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
+          }}>
+            <div><strong>Food Detected:</strong> {result.type}</div>
+            <div><strong>Confidence:</strong> {result.confidence}%</div>
+            <br />
+            <div><strong>Freshness:</strong> {result.freshness}%</div>
+            <div><strong>Status:</strong> <span style={{
+              fontWeight: 700,
+              color: result.freshnessStatus?.includes('Fresh') ? '#16a34a' : result.freshnessStatus?.includes('Moderately') ? '#d97706' : '#dc2626'
+            }}>{result.freshnessStatus || (result.freshness > 80 ? 'Fresh ✅' : result.freshness > 50 ? 'Moderately Fresh ⚠️' : 'Rotten ❌')}</span></div>
+            <br />
+            <div><strong>Recommendation:</strong> {result.recommendation || 'Safe for donation'}</div>
+            {result.reason && (
+              <>
+                <br />
+                <div><strong>Reason:</strong> {result.reason}</div>
+              </>
+            )}
           </div>
 
           <div className="detector-result-grid">
@@ -506,6 +606,8 @@ export default function FoodDetector({ onDetect }) {
                     ...selected,
                     confidence: 100,
                     freshness: result.freshness,
+                    freshnessStatus: result.freshnessStatus,
+                    recommendation: result.recommendation,
                     servings: estimateServings(features, selected.type, result.freshness),
                     alternatives: []
                   };

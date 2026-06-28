@@ -150,7 +150,50 @@ router.get('/me', protect, async (req, res) => {
     role: req.user.role,
     phone: req.user.phone,
     location: req.user.location,
+    dailyRequirement: req.user.dailyRequirement,
   });
+});
+
+/**
+ * PUT /api/auth/daily-requirement
+ * Update current authenticated receiver's daily food requirement preferences
+ */
+router.put('/daily-requirement', protect, async (req, res) => {
+  try {
+    if (req.user.role !== 'receiver') {
+      return res.status(403).json({ message: 'Only receivers can configure daily food requirements' });
+    }
+
+    const { enabled, quantity, preferredTime, mealType } = req.body;
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.dailyRequirement = {
+      enabled: enabled ?? user.dailyRequirement.enabled,
+      quantity: quantity !== undefined ? Number(quantity) : user.dailyRequirement.quantity,
+      preferredTime: preferredTime ?? user.dailyRequirement.preferredTime,
+      mealType: mealType ?? user.dailyRequirement.mealType,
+      lastTriggeredDate: user.dailyRequirement.lastTriggeredDate,
+    };
+
+    await user.save();
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      location: user.location,
+      dailyRequirement: user.dailyRequirement,
+    });
+  } catch (error) {
+    console.error('Update daily requirement error:', error);
+    res.status(500).json({ message: 'Server error while updating preferences' });
+  }
 });
 
 module.exports = router;
