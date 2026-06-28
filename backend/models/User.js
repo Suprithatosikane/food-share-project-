@@ -38,6 +38,13 @@ const userSchema = new mongoose.Schema({
     lat: { type: Number, default: 0 },
     lng: { type: Number, default: 0 },
   },
+  dailyRequirement: {
+    enabled: { type: Boolean, default: false },
+    quantity: { type: Number, default: 0 },
+    preferredTime: { type: String, default: '12:00' },
+    mealType: { type: String, default: '' },
+    lastTriggeredDate: { type: String, default: '' },
+  },
 }, { timestamps: true });
 
 // Hash password before saving (Mongoose 9: async hooks don't use next())

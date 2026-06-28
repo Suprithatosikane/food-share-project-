@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { getDeliveries, acceptDelivery, markPicked, markDelivered } from '../api';
 import MapView from '../components/MapView';
 
@@ -7,14 +8,25 @@ import MapView from '../components/MapView';
  * VolunteerDashboard — Volunteer can view tasks, accept, and update delivery status.
  */
 export default function VolunteerDashboard() {
-  const { user } = useAuth();
+  const { user, ensureGuestLogin } = useAuth();
+  const { playSoftAlert, playSuccessSound, playLaunchSound } = useTheme();
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('available');
   const [alert, setAlert] = useState(null);
 
   useEffect(() => {
-    fetchDeliveries();
+    const loadData = async () => {
+      // Auto-login as guest volunteer if needed
+      const loggedInUser = await ensureGuestLogin('volunteer');
+      if (loggedInUser) {
+        await fetchDeliveries();
+      } else {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
   }, []);
 
   const fetchDeliveries = async () => {
@@ -30,7 +42,13 @@ export default function VolunteerDashboard() {
   };
 
   const handleAccept = async (id) => {
+    if (!user) {
+      setAlert({ type: 'error', message: 'Please login to accept tasks!' });
+      setTimeout(() => setAlert(null), 3000);
+      return;
+    }
     try {
+      if (playLaunchSound) playLaunchSound(); // Keep the sound if it exists
       await acceptDelivery(id);
       setAlert({ type: 'success', message: 'Delivery accepted! 🚗' });
       fetchDeliveries();
@@ -54,6 +72,7 @@ export default function VolunteerDashboard() {
   const handleDelivered = async (id) => {
     try {
       await markDelivered(id);
+      playSuccessSound();
       setAlert({ type: 'success', message: 'Food delivered successfully! 🎉' });
       fetchDeliveries();
       setTimeout(() => setAlert(null), 3000);
@@ -72,7 +91,7 @@ export default function VolunteerDashboard() {
   }
 
   const availableTasks = deliveries.filter(d => d.status === 'pending');
-  const myTasks = deliveries.filter(d => d.volunteerId && d.volunteerId._id === user._id);
+  const myTasks = user ? deliveries.filter(d => d.volunteerId && d.volunteerId._id === user._id) : [];
   const activeTasks = myTasks.filter(d => d.status !== 'delivered');
   const completedTasks = myTasks.filter(d => d.status === 'delivered');
 
@@ -131,7 +150,7 @@ export default function VolunteerDashboard() {
       <div className="dashboard-header">
         <div>
           <h1>🟡 Volunteer Dashboard</h1>
-          <p>Welcome, {user.name}! Manage your delivery tasks.</p>
+          <p>Welcome{user ? `, ${user.name}` : ''}! Manage your delivery tasks.</p>
         </div>
         <button className="btn btn-primary" onClick={fetchDeliveries}>
           🔄 Refresh
@@ -197,6 +216,7 @@ export default function VolunteerDashboard() {
                 <div key={del._id} className="delivery-card">
                   <div className="delivery-info">
                     <h4>{del.foodId?.foodType || 'Food Item'}</h4>
+                    <p>📦 Quantity: {del.requestedQuantity || del.foodId?.quantity}</p>
                     <p>📍 Pickup: {del.pickupLocation?.address || 'N/A'}</p>
                     <p>📍 Drop: {del.dropLocation?.address || 'N/A'}</p>
                     {del.foodId?.donorId && <p>👤 Donor: {del.foodId.donorId.name}</p>}
@@ -223,6 +243,7 @@ export default function VolunteerDashboard() {
                 <div key={del._id} className="delivery-card active-delivery">
                   <div className="delivery-info">
                     <h4>{del.foodId?.foodType || 'Food Item'}</h4>
+                    <p>📦 Quantity: {del.requestedQuantity || del.foodId?.quantity}</p>
                     <p>📍 Pickup: {del.pickupLocation?.address || 'N/A'}</p>
                     <p>📍 Drop: {del.dropLocation?.address || 'N/A'}</p>
                     {del.foodId?.donorId && (
@@ -259,6 +280,7 @@ export default function VolunteerDashboard() {
                 <div key={del._id} className="delivery-card completed-delivery">
                   <div className="delivery-info">
                     <h4>{del.foodId?.foodType || 'Food Item'}</h4>
+                    <p>📦 Quantity: {del.requestedQuantity || del.foodId?.quantity}</p>
                     <p>📍 Pickup: {del.pickupLocation?.address || 'N/A'}</p>
                     <p>📍 Drop: {del.dropLocation?.address || 'N/A'}</p>
                   </div>
